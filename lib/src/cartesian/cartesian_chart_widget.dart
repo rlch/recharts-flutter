@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../core/types/chart_data.dart';
+import '../core/animation/easing_curves.dart';
 import 'axis/x_axis.dart';
 import 'axis/y_axis.dart';
 import 'grid/cartesian_grid.dart';
 import 'series/line_series.dart';
 import 'series/area_series.dart';
 import 'series/bar_series.dart';
-import 'painters/cartesian_chart_painter.dart';
+import 'painters/animated_cartesian_chart_painter.dart';
 import '../state/models/chart_layout.dart';
 import '../state/models/computed_data.dart';
 import '../state/models/interaction_state.dart';
@@ -17,6 +18,7 @@ import '../state/providers/line_points_provider.dart';
 import '../state/providers/area_points_provider.dart';
 import '../state/providers/bar_rects_provider.dart';
 import '../state/controllers/chart_interaction_controller.dart';
+import '../state/controllers/chart_animation_controller.dart';
 import '../components/tooltip/tooltip.dart';
 
 sealed class CartesianChild {}
@@ -35,6 +37,12 @@ class CartesianChartWidget extends StatefulWidget {
   final Color? backgroundColor;
   final ChartTooltip? tooltip;
 
+  final Duration animationDuration;
+  final Curve animationEasing;
+  final bool isAnimationActive;
+  final VoidCallback? onAnimationStart;
+  final VoidCallback? onAnimationEnd;
+
   const CartesianChartWidget({
     super.key,
     this.width,
@@ -49,6 +57,11 @@ class CartesianChartWidget extends StatefulWidget {
     this.barSeries = const [],
     this.backgroundColor,
     this.tooltip,
+    this.animationDuration = const Duration(milliseconds: 300),
+    this.animationEasing = ease,
+    this.isAnimationActive = true,
+    this.onAnimationStart,
+    this.onAnimationEnd,
   });
 
   @override
@@ -96,6 +109,11 @@ class _CartesianChartWidgetState extends State<CartesianChartWidget> {
           barSeries: widget.barSeries,
           backgroundColor: widget.backgroundColor,
           tooltip: widget.tooltip,
+          animationDuration: widget.animationDuration,
+          animationEasing: widget.animationEasing,
+          isAnimationActive: widget.isAnimationActive,
+          onAnimationStart: widget.onAnimationStart,
+          onAnimationEnd: widget.onAnimationEnd,
         );
       },
     );
@@ -125,6 +143,11 @@ class _ChartContent extends StatefulWidget {
   final List<BarSeries> barSeries;
   final Color? backgroundColor;
   final ChartTooltip? tooltip;
+  final Duration animationDuration;
+  final Curve animationEasing;
+  final bool isAnimationActive;
+  final VoidCallback? onAnimationStart;
+  final VoidCallback? onAnimationEnd;
 
   const _ChartContent({
     required this.width,
@@ -139,26 +162,99 @@ class _ChartContent extends StatefulWidget {
     required this.barSeries,
     this.backgroundColor,
     this.tooltip,
+    required this.animationDuration,
+    required this.animationEasing,
+    required this.isAnimationActive,
+    this.onAnimationStart,
+    this.onAnimationEnd,
   });
 
   @override
   State<_ChartContent> createState() => _ChartContentState();
 }
 
-class _ChartContentState extends State<_ChartContent> {
+class _ChartContentState extends State<_ChartContent>
+    with SingleTickerProviderStateMixin {
   ChartInteractionState _interactionState = ChartInteractionState.inactive;
   ChartInteractionController? _controller;
+
+  ChartAnimationController? _animationController;
+  double _animationProgress = 1.0;
+
+  Map<String, List<LinePoint>>? _previousLinePointsMap;
+  Map<String, List<AreaPoint>>? _previousAreaPointsMap;
+  Map<String, List<BarRect>>? _previousBarRectsMap;
+
+  Map<String, List<LinePoint>> _currentLinePointsMap = {};
+  Map<String, List<AreaPoint>> _currentAreaPointsMap = {};
+  Map<String, List<BarRect>> _currentBarRectsMap = {};
+
+  bool _isFirstBuild = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initAnimationController();
+  }
+
+  void _initAnimationController() {
+    _animationController = ChartAnimationController(
+      vsync: this,
+      duration: widget.animationDuration,
+      curve: widget.animationEasing,
+      onProgress: _handleAnimationProgress,
+      onComplete: _handleAnimationComplete,
+    );
+  }
+
+  void _handleAnimationProgress(double progress) {
+    setState(() {
+      _animationProgress = progress;
+    });
+  }
+
+  void _handleAnimationComplete() {
+    _previousLinePointsMap = null;
+    _previousAreaPointsMap = null;
+    _previousBarRectsMap = null;
+    widget.onAnimationEnd?.call();
+  }
 
   @override
   void didUpdateWidget(_ChartContent oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (widget.animationDuration != oldWidget.animationDuration) {
+      _animationController?.duration = widget.animationDuration;
+    }
+    if (widget.animationEasing != oldWidget.animationEasing) {
+      _animationController?.curve = widget.animationEasing;
+    }
+
     _controller = null;
+  }
+
+  @override
+  void dispose() {
+    _animationController?.dispose();
+    super.dispose();
   }
 
   void _handleStateChanged(ChartInteractionState state) {
     setState(() {
       _interactionState = state;
     });
+  }
+
+  void _triggerAnimation() {
+    if (!widget.isAnimationActive) {
+      _animationProgress = 1.0;
+      return;
+    }
+
+    widget.onAnimationStart?.call();
+    _animationProgress = 0.0;
+    _animationController?.animate();
   }
 
   @override
@@ -230,6 +326,24 @@ class _ChartContentState extends State<_ChartContent> {
       );
     }
 
+    final dataChanged = _hasDataChanged(linePointsMap, areaPointsMap, barRectsMap);
+
+    if (dataChanged && !_isFirstBuild && widget.isAnimationActive) {
+      _previousLinePointsMap = Map.from(_currentLinePointsMap);
+      _previousAreaPointsMap = Map.from(_currentAreaPointsMap);
+      _previousBarRectsMap = Map.from(_currentBarRectsMap);
+      _triggerAnimation();
+    }
+
+    _currentLinePointsMap = linePointsMap;
+    _currentAreaPointsMap = areaPointsMap;
+    _currentBarRectsMap = barRectsMap;
+
+    if (_isFirstBuild && widget.isAnimationActive) {
+      _triggerAnimation();
+    }
+    _isFirstBuild = false;
+
     final seriesInfoList = <SeriesInfo>[
       ...widget.lineSeries.map((s) => SeriesInfo(
             dataKey: s.dataKey,
@@ -284,7 +398,7 @@ class _ChartContentState extends State<_ChartContent> {
       color: widget.backgroundColor,
       child: CustomPaint(
         size: Size(widget.width, widget.height),
-        painter: CartesianChartPainter(
+        painter: AnimatedCartesianChartPainter(
           layout: layout,
           grid: widget.grid,
           xAxes: effectiveXAxes,
@@ -297,6 +411,10 @@ class _ChartContentState extends State<_ChartContent> {
           linePointsMap: linePointsMap,
           areaPointsMap: areaPointsMap,
           barRectsMap: barRectsMap,
+          previousLinePointsMap: _previousLinePointsMap,
+          previousAreaPointsMap: _previousAreaPointsMap,
+          previousBarRectsMap: _previousBarRectsMap,
+          animationProgress: _animationProgress,
           cursorConfig: tooltipEnabled ? cursorConfig : null,
           activeX: activeX,
           activePoints: activePoints,
@@ -337,5 +455,63 @@ class _ChartContentState extends State<_ChartContent> {
     }
 
     return chartWidget;
+  }
+
+  bool _hasDataChanged(
+    Map<String, List<LinePoint>> linePointsMap,
+    Map<String, List<AreaPoint>> areaPointsMap,
+    Map<String, List<BarRect>> barRectsMap,
+  ) {
+    if (_currentLinePointsMap.isEmpty &&
+        _currentAreaPointsMap.isEmpty &&
+        _currentBarRectsMap.isEmpty) {
+      return false;
+    }
+
+    if (linePointsMap.length != _currentLinePointsMap.length ||
+        areaPointsMap.length != _currentAreaPointsMap.length ||
+        barRectsMap.length != _currentBarRectsMap.length) {
+      return true;
+    }
+
+    for (final key in linePointsMap.keys) {
+      final current = _currentLinePointsMap[key];
+      final next = linePointsMap[key];
+      if (current == null || next == null) return true;
+      if (current.length != next.length) return true;
+      for (int i = 0; i < current.length; i++) {
+        if (current[i].x != next[i].x || current[i].y != next[i].y) {
+          return true;
+        }
+      }
+    }
+
+    for (final key in areaPointsMap.keys) {
+      final current = _currentAreaPointsMap[key];
+      final next = areaPointsMap[key];
+      if (current == null || next == null) return true;
+      if (current.length != next.length) return true;
+      for (int i = 0; i < current.length; i++) {
+        if (current[i].x != next[i].x ||
+            current[i].y != next[i].y ||
+            current[i].baseY != next[i].baseY) {
+          return true;
+        }
+      }
+    }
+
+    for (final key in barRectsMap.keys) {
+      final current = _currentBarRectsMap[key];
+      final next = barRectsMap[key];
+      if (current == null || next == null) return true;
+      if (current.length != next.length) return true;
+      for (int i = 0; i < current.length; i++) {
+        if (current[i].rect != next[i].rect) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 }

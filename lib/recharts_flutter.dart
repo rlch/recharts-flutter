@@ -9,6 +9,10 @@ export 'src/core/scale/linear_scale.dart';
 export 'src/core/scale/band_scale.dart';
 export 'src/core/scale/point_scale.dart';
 
+// Animation
+export 'src/core/animation/easing_curves.dart';
+export 'src/core/animation/geometry_interpolation.dart';
+
 // Types
 export 'src/core/types/chart_data.dart';
 export 'src/core/types/axis_types.dart';
@@ -31,3 +35,4 @@ export 'src/cartesian/series/bar_series.dart';
 export 'src/state/models/chart_layout.dart';
 export 'src/state/models/interaction_state.dart';
 export 'src/state/controllers/chart_interaction_controller.dart';
+export 'src/state/controllers/chart_animation_controller.dart';
