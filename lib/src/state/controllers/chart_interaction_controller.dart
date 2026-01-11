@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import '../../core/scale/scale.dart';
 import '../../core/types/chart_data.dart';
+import '../../core/types/series_types.dart';
 import '../../components/tooltip/tooltip_types.dart';
 import '../models/chart_layout.dart';
 import '../models/interaction_state.dart';
@@ -13,12 +14,14 @@ class SeriesInfo {
   final String? name;
   final Color color;
   final String? unit;
+  final LegendType legendType;
 
   const SeriesInfo({
     required this.dataKey,
     this.name,
     required this.color,
     this.unit,
+    this.legendType = LegendType.square,
   });
 
   String get displayName => name ?? dataKey;

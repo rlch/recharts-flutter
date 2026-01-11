@@ -21,6 +21,9 @@ export 'src/core/types/series_types.dart';
 // Components
 export 'src/components/chart_widget.dart';
 export 'src/components/tooltip/tooltip.dart';
+export 'src/components/legend/legend.dart';
+export 'src/components/brush/brush.dart';
+export 'src/components/responsive_chart_container.dart';
 
 // Cartesian
 export 'src/cartesian/cartesian_chart_widget.dart';
@@ -30,6 +33,7 @@ export 'src/cartesian/grid/cartesian_grid.dart';
 export 'src/cartesian/series/line_series.dart';
 export 'src/cartesian/series/area_series.dart';
 export 'src/cartesian/series/bar_series.dart';
+export 'src/cartesian/reference/reference.dart';
 
 // Polar
 export 'src/polar/polar_chart_widget.dart';
@@ -48,3 +52,5 @@ export 'src/state/models/interaction_state.dart';
 export 'src/state/controllers/chart_interaction_controller.dart';
 export 'src/state/controllers/chart_animation_controller.dart';
 export 'src/state/controllers/polar_hit_testing.dart';
+export 'src/state/legend_state.dart';
+export 'src/state/brush_state.dart';
