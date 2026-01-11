@@ -11,9 +11,11 @@ import 'grid_painter.dart';
 import 'line_series_painter.dart';
 import 'area_series_painter.dart';
 import 'bar_series_painter.dart';
+import 'cursor_painter.dart';
 import '../../core/scale/scale.dart';
 import '../../state/models/chart_layout.dart';
 import '../../state/models/computed_data.dart';
+import '../../components/tooltip/tooltip_types.dart';
 
 class CartesianChartPainter extends CustomPainter {
   final ChartLayout layout;
@@ -28,6 +30,9 @@ class CartesianChartPainter extends CustomPainter {
   final Map<String, List<LinePoint>> linePointsMap;
   final Map<String, List<AreaPoint>> areaPointsMap;
   final Map<String, List<BarRect>> barRectsMap;
+  final CursorConfig? cursorConfig;
+  final double? activeX;
+  final List<Offset?> activePoints;
 
   CartesianChartPainter({
     required this.layout,
@@ -42,6 +47,9 @@ class CartesianChartPainter extends CustomPainter {
     required this.linePointsMap,
     required this.areaPointsMap,
     required this.barRectsMap,
+    this.cursorConfig,
+    this.activeX,
+    this.activePoints = const [],
   });
 
   @override
@@ -57,6 +65,27 @@ class CartesianChartPainter extends CustomPainter {
     _paintLines(canvas, size);
 
     _paintAxes(canvas, size);
+
+    _paintCursor(canvas, size);
+  }
+
+  void _paintCursor(Canvas canvas, Size size) {
+    if (cursorConfig == null || activeX == null) return;
+
+    final seriesColors = <Color>[
+      ...lineSeries.map((s) => s.stroke),
+      ...areaSeries.map((s) => s.stroke),
+      ...barSeries.map((s) => s.fill),
+    ];
+
+    final cursorPainter = CursorPainter(
+      config: cursorConfig!,
+      layout: layout,
+      activeX: activeX,
+      activePoints: activePoints,
+      seriesColors: seriesColors,
+    );
+    cursorPainter.paint(canvas, size);
   }
 
   void _paintGrid(Canvas canvas, Size size) {

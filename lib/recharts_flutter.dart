@@ -16,3 +16,18 @@ export 'src/core/types/series_types.dart';
 
 // Components
 export 'src/components/chart_widget.dart';
+export 'src/components/tooltip/tooltip.dart';
+
+// Cartesian
+export 'src/cartesian/cartesian_chart_widget.dart';
+export 'src/cartesian/axis/x_axis.dart';
+export 'src/cartesian/axis/y_axis.dart';
+export 'src/cartesian/grid/cartesian_grid.dart';
+export 'src/cartesian/series/line_series.dart';
+export 'src/cartesian/series/area_series.dart';
+export 'src/cartesian/series/bar_series.dart';
+
+// State
+export 'src/state/models/chart_layout.dart';
+export 'src/state/models/interaction_state.dart';
+export 'src/state/controllers/chart_interaction_controller.dart';
