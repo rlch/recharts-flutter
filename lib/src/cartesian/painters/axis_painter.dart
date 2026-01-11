@@ -1,0 +1,194 @@
+import 'package:flutter/rendering.dart';
+
+import '../../core/scale/scale.dart';
+import '../axis/x_axis.dart';
+import '../axis/y_axis.dart';
+
+class AxisPainter {
+  final Scale<dynamic, double> scale;
+  final bool isXAxis;
+  final bool isLeft;
+  final bool isTop;
+  final double axisPosition;
+  final double plotStart;
+  final double plotEnd;
+  final int tickCount;
+  final Color tickColor;
+  final Color labelColor;
+  final double tickSize;
+  final double tickMargin;
+  final String? unit;
+  final bool hide;
+
+  AxisPainter({
+    required this.scale,
+    required this.isXAxis,
+    this.isLeft = true,
+    this.isTop = false,
+    required this.axisPosition,
+    required this.plotStart,
+    required this.plotEnd,
+    this.tickCount = 5,
+    this.tickColor = const Color(0xFF666666),
+    this.labelColor = const Color(0xFF666666),
+    this.tickSize = 6,
+    this.tickMargin = 3,
+    this.unit,
+    this.hide = false,
+  });
+
+  factory AxisPainter.fromXAxis({
+    required XAxis axis,
+    required Scale<dynamic, double> scale,
+    required double axisY,
+    required double plotLeft,
+    required double plotRight,
+  }) {
+    return AxisPainter(
+      scale: scale,
+      isXAxis: true,
+      isTop: axis.orientation == AxisOrientation.top,
+      axisPosition: axisY,
+      plotStart: plotLeft,
+      plotEnd: plotRight,
+      tickCount: axis.tickCount ?? 5,
+      tickMargin: axis.tickMargin ?? 3,
+      unit: axis.unit,
+      hide: axis.hide,
+    );
+  }
+
+  factory AxisPainter.fromYAxis({
+    required YAxis axis,
+    required Scale<dynamic, double> scale,
+    required double axisX,
+    required double plotTop,
+    required double plotBottom,
+  }) {
+    return AxisPainter(
+      scale: scale,
+      isXAxis: false,
+      isLeft: axis.orientation == AxisOrientation.left,
+      axisPosition: axisX,
+      plotStart: plotTop,
+      plotEnd: plotBottom,
+      tickCount: axis.tickCount ?? 5,
+      tickMargin: axis.tickMargin ?? 3,
+      unit: axis.unit,
+      hide: axis.hide,
+    );
+  }
+
+  void paint(Canvas canvas, Size size) {
+    if (hide) return;
+
+    final axisPaint = Paint()
+      ..color = tickColor
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    if (isXAxis) {
+      _paintXAxis(canvas, axisPaint);
+    } else {
+      _paintYAxis(canvas, axisPaint);
+    }
+  }
+
+  void _paintXAxis(Canvas canvas, Paint axisPaint) {
+    canvas.drawLine(
+      Offset(plotStart, axisPosition),
+      Offset(plotEnd, axisPosition),
+      axisPaint,
+    );
+
+    final ticks = scale.ticks(tickCount);
+    final bandwidth = scale.bandwidth ?? 0;
+    final xOffset = bandwidth / 2;
+
+    for (final tick in ticks) {
+      final x = scale(tick) + xOffset;
+      if (x < plotStart || x > plotEnd) continue;
+
+      final tickStart = isTop ? axisPosition - tickSize : axisPosition;
+      final tickEnd = isTop ? axisPosition : axisPosition + tickSize;
+
+      canvas.drawLine(
+        Offset(x, tickStart),
+        Offset(x, tickEnd),
+        axisPaint,
+      );
+
+      final label = _formatLabel(tick);
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(color: labelColor, fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      final labelY = isTop
+          ? axisPosition - tickSize - tickMargin - textPainter.height
+          : axisPosition + tickSize + tickMargin;
+
+      textPainter.paint(
+        canvas,
+        Offset(x - textPainter.width / 2, labelY),
+      );
+    }
+  }
+
+  void _paintYAxis(Canvas canvas, Paint axisPaint) {
+    canvas.drawLine(
+      Offset(axisPosition, plotStart),
+      Offset(axisPosition, plotEnd),
+      axisPaint,
+    );
+
+    final ticks = scale.ticks(tickCount);
+
+    for (final tick in ticks) {
+      final y = scale(tick);
+      if (y < plotStart || y > plotEnd) continue;
+
+      final tickStart = isLeft ? axisPosition - tickSize : axisPosition;
+      final tickEnd = isLeft ? axisPosition : axisPosition + tickSize;
+
+      canvas.drawLine(
+        Offset(tickStart, y),
+        Offset(tickEnd, y),
+        axisPaint,
+      );
+
+      final label = _formatLabel(tick);
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(color: labelColor, fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      final labelX = isLeft
+          ? axisPosition - tickSize - tickMargin - textPainter.width
+          : axisPosition + tickSize + tickMargin;
+
+      textPainter.paint(
+        canvas,
+        Offset(labelX, y - textPainter.height / 2),
+      );
+    }
+  }
+
+  String _formatLabel(dynamic value) {
+    if (value is double) {
+      if (value == value.toInt()) {
+        return '${value.toInt()}${unit ?? ''}';
+      }
+      return '${value.toStringAsFixed(1)}${unit ?? ''}';
+    }
+    return '$value${unit ?? ''}';
+  }
+}
