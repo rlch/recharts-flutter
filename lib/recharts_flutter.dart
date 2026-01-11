@@ -31,8 +31,20 @@ export 'src/cartesian/series/line_series.dart';
 export 'src/cartesian/series/area_series.dart';
 export 'src/cartesian/series/bar_series.dart';
 
+// Polar
+export 'src/polar/polar_chart_widget.dart';
+export 'src/polar/polar_layout.dart';
+export 'src/polar/axis/polar_angle_axis.dart';
+export 'src/polar/axis/polar_radius_axis.dart';
+export 'src/polar/grid/polar_grid.dart';
+export 'src/polar/series/pie_series.dart';
+export 'src/polar/series/radial_bar_series.dart';
+export 'src/polar/series/radar_series.dart';
+
 // State
 export 'src/state/models/chart_layout.dart';
+export 'src/state/models/polar_data.dart';
 export 'src/state/models/interaction_state.dart';
 export 'src/state/controllers/chart_interaction_controller.dart';
 export 'src/state/controllers/chart_animation_controller.dart';
+export 'src/state/controllers/polar_hit_testing.dart';
