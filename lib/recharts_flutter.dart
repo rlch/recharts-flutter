@@ -54,3 +54,31 @@ export 'src/state/controllers/chart_animation_controller.dart';
 export 'src/state/controllers/polar_hit_testing.dart';
 export 'src/state/legend_state.dart';
 export 'src/state/brush_state.dart';
+
+// Scatter
+export 'src/cartesian/series/scatter_series.dart';
+export 'src/cartesian/painters/scatter_series_painter.dart';
+
+// Funnel
+export 'src/funnel/funnel_chart.dart';
+export 'src/funnel/funnel_series.dart';
+export 'src/funnel/funnel_geometry.dart';
+export 'src/funnel/funnel_painter.dart';
+
+// Treemap
+export 'src/treemap/treemap_chart.dart';
+export 'src/treemap/treemap_node.dart';
+export 'src/treemap/squarified_layout.dart';
+export 'src/treemap/treemap_painter.dart';
+
+// Sunburst
+export 'src/sunburst/sunburst_chart.dart';
+export 'src/sunburst/sunburst_node.dart';
+export 'src/sunburst/sunburst_layout.dart';
+export 'src/sunburst/sunburst_painter.dart';
+
+// Sankey
+export 'src/sankey/sankey_chart.dart';
+export 'src/sankey/sankey_data.dart';
+export 'src/sankey/sankey_layout.dart';
+export 'src/sankey/sankey_painter.dart';
