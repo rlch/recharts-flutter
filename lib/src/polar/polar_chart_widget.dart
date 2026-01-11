@@ -7,6 +7,7 @@ import '../state/controllers/polar_hit_testing.dart';
 import '../state/models/polar_data.dart';
 import '../state/providers/polar_geometry_provider.dart';
 import '../state/providers/polar_tooltip_provider.dart';
+import '../state/sync/chart_sync_bus.dart';
 import '../components/tooltip/tooltip.dart';
 import 'polar_layout.dart';
 import 'axis/polar_angle_axis.dart';
@@ -17,25 +18,83 @@ import 'series/radial_bar_series.dart';
 import 'series/radar_series.dart';
 import 'painters/polar_chart_painter.dart';
 
+/// A polar chart widget that supports pie, radial bar, and radar series.
+///
+/// ## Synchronization
+/// Charts with the same [syncId] share tooltip/interaction state.
+///
+/// ## Example
+/// ```dart
+/// PolarChartWidget(
+///   syncId: 'group1',
+///   data: myData,
+///   pieSeries: [PieSeries(dataKey: 'value')],
+/// )
+/// ```
 class PolarChartWidget extends StatefulWidget {
+  /// Fixed width of the chart. If null, uses available width from parent.
   final double? width;
+
+  /// Fixed height of the chart. If null, uses available height from parent.
   final double? height;
+
+  /// The data to display in the chart.
   final ChartData data;
+
+  /// Padding around the chart.
   final double padding;
+
+  /// Inner radius as percentage of max radius (for donut charts).
   final double? innerRadiusPercent;
+
+  /// Outer radius as percentage of available space.
   final double? outerRadiusPercent;
+
+  /// Background color of the chart.
   final Color? backgroundColor;
+
+  /// Angle axis configuration (for radar charts).
   final PolarAngleAxis? angleAxis;
+
+  /// Radius axis configuration (for radar charts).
   final PolarRadiusAxis? radiusAxis;
+
+  /// Polar grid configuration.
   final PolarGrid? grid;
+
+  /// Pie series to render.
   final List<PieSeries> pieSeries;
+
+  /// Radial bar series to render.
   final List<RadialBarSeries> radialBarSeries;
+
+  /// Radar series to render.
   final List<RadarSeries> radarSeries;
+
+  /// Tooltip configuration.
   final ChartTooltip? tooltip;
+
+  /// Synchronization ID for coordinating tooltips across multiple charts.
+  ///
+  /// Charts with the same [syncId] will share hover/tooltip state.
+  final String? syncId;
+
+  /// Method used for synchronization. Defaults to [SyncMethod.byIndex].
+  final SyncMethod syncMethod;
+
+  /// Duration of data transition animations.
   final Duration animationDuration;
+
+  /// Easing curve for animations.
   final Curve animationEasing;
+
+  /// Whether animations are enabled.
   final bool isAnimationActive;
+
+  /// Callback when animation starts.
   final VoidCallback? onAnimationStart;
+
+  /// Callback when animation ends.
   final VoidCallback? onAnimationEnd;
 
   const PolarChartWidget({
@@ -54,6 +113,8 @@ class PolarChartWidget extends StatefulWidget {
     this.radialBarSeries = const [],
     this.radarSeries = const [],
     this.tooltip,
+    this.syncId,
+    this.syncMethod = SyncMethod.byIndex,
     this.animationDuration = const Duration(milliseconds: 400),
     this.animationEasing = ease,
     this.isAnimationActive = true,
@@ -108,6 +169,8 @@ class _PolarChartWidgetState extends State<PolarChartWidget> {
           radialBarSeries: widget.radialBarSeries,
           radarSeries: widget.radarSeries,
           tooltip: widget.tooltip,
+          syncId: widget.syncId,
+          syncMethod: widget.syncMethod,
           animationDuration: widget.animationDuration,
           animationEasing: widget.animationEasing,
           isAnimationActive: widget.isAnimationActive,
@@ -144,6 +207,8 @@ class _PolarChartContent extends StatefulWidget {
   final List<RadialBarSeries> radialBarSeries;
   final List<RadarSeries> radarSeries;
   final ChartTooltip? tooltip;
+  final String? syncId;
+  final SyncMethod syncMethod;
   final Duration animationDuration;
   final Curve animationEasing;
   final bool isAnimationActive;
@@ -165,6 +230,8 @@ class _PolarChartContent extends StatefulWidget {
     required this.radialBarSeries,
     required this.radarSeries,
     this.tooltip,
+    this.syncId,
+    required this.syncMethod,
     required this.animationDuration,
     required this.animationEasing,
     required this.isAnimationActive,
@@ -195,10 +262,44 @@ class _PolarChartContentState extends State<_PolarChartContent>
   Offset? _activeCoordinate;
   int? _activeIndex;
 
+  VoidCallback? _syncUnsubscribe;
+  final String _chartId = UniqueKey().toString();
+
   @override
   void initState() {
     super.initState();
     _initAnimationController();
+    _registerSync();
+  }
+
+  void _registerSync() {
+    if (widget.syncId != null) {
+      _syncUnsubscribe = ChartSyncBus.instance.register(
+        widget.syncId!,
+        _handleSyncUpdate,
+      );
+    }
+  }
+
+  void _unregisterSync() {
+    _syncUnsubscribe?.call();
+    _syncUnsubscribe = null;
+  }
+
+  void _handleSyncUpdate(SyncHoverPayload? payload) {
+    if (payload?.sourceChartId == _chartId) return;
+
+    if (payload == null) {
+      setState(() {
+        _activeTooltip = null;
+        _activeCoordinate = null;
+        _activeIndex = null;
+      });
+    } else if (payload.index != null) {
+      setState(() {
+        _activeIndex = payload.index;
+      });
+    }
   }
 
   void _initAnimationController() {
@@ -234,10 +335,16 @@ class _PolarChartContentState extends State<_PolarChartContent>
     if (widget.animationEasing != oldWidget.animationEasing) {
       _animationController?.curve = widget.animationEasing;
     }
+
+    if (widget.syncId != oldWidget.syncId) {
+      _unregisterSync();
+      _registerSync();
+    }
   }
 
   @override
   void dispose() {
+    _unregisterSync();
     _animationController?.dispose();
     super.dispose();
   }
@@ -260,6 +367,15 @@ class _PolarChartContentState extends State<_PolarChartContent>
         _activeCoordinate = position;
         _activeIndex = result.sectorIndex;
       });
+
+      if (widget.syncId != null) {
+        ChartSyncBus.instance.notifyHover(SyncHoverPayload(
+          syncId: widget.syncId!,
+          index: result.sectorIndex,
+          coordinate: position,
+          sourceChartId: _chartId,
+        ));
+      }
     }
   }
 
@@ -269,6 +385,10 @@ class _PolarChartContentState extends State<_PolarChartContent>
       _activeCoordinate = null;
       _activeIndex = null;
     });
+
+    if (widget.syncId != null) {
+      ChartSyncBus.instance.clearHover(widget.syncId!, sourceChartId: _chartId);
+    }
   }
 
   PolarTooltipPayload? _findElementAtPoint(Offset point) {

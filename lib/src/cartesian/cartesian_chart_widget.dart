@@ -19,28 +19,85 @@ import '../state/providers/area_points_provider.dart';
 import '../state/providers/bar_rects_provider.dart';
 import '../state/controllers/chart_interaction_controller.dart';
 import '../state/controllers/chart_animation_controller.dart';
+import '../state/sync/chart_sync_bus.dart';
 import '../components/tooltip/tooltip.dart';
 
 sealed class CartesianChild {}
 
+/// A cartesian chart widget that supports line, area, and bar series.
+///
+/// ## Synchronization
+/// Charts with the same [syncId] share tooltip/interaction state.
+/// When hovering on one chart, all synced charts show the same index.
+///
+/// ## Example
+/// ```dart
+/// CartesianChartWidget(
+///   syncId: 'group1',
+///   data: myData,
+///   lineSeries: [LineSeries(dataKey: 'value')],
+/// )
+/// ```
 class CartesianChartWidget extends StatefulWidget {
+  /// Fixed width of the chart. If null, uses available width from parent.
   final double? width;
+
+  /// Fixed height of the chart. If null, uses available height from parent.
   final double? height;
+
+  /// The data to display in the chart.
   final ChartData data;
+
+  /// Margins around the plot area for axes and labels.
   final ChartMargin? margin;
+
+  /// X-axis configurations. Defaults to single auto-configured axis.
   final List<XAxis> xAxes;
+
+  /// Y-axis configurations. Defaults to single auto-configured axis.
   final List<YAxis> yAxes;
+
+  /// Grid line configuration.
   final CartesianGrid? grid;
+
+  /// Line series to render.
   final List<LineSeries> lineSeries;
+
+  /// Area series to render.
   final List<AreaSeries> areaSeries;
+
+  /// Bar series to render.
   final List<BarSeries> barSeries;
+
+  /// Background color of the chart.
   final Color? backgroundColor;
+
+  /// Tooltip configuration.
   final ChartTooltip? tooltip;
 
+  /// Synchronization ID for coordinating tooltips across multiple charts.
+  ///
+  /// Charts with the same [syncId] will share hover/tooltip state.
+  /// When one chart is hovered, all charts with the same syncId will
+  /// show tooltips at the same data index.
+  final String? syncId;
+
+  /// Method used for synchronization. Defaults to [SyncMethod.byIndex].
+  final SyncMethod syncMethod;
+
+  /// Duration of data transition animations.
   final Duration animationDuration;
+
+  /// Easing curve for animations.
   final Curve animationEasing;
+
+  /// Whether animations are enabled.
   final bool isAnimationActive;
+
+  /// Callback when animation starts.
   final VoidCallback? onAnimationStart;
+
+  /// Callback when animation ends.
   final VoidCallback? onAnimationEnd;
 
   const CartesianChartWidget({
@@ -57,6 +114,8 @@ class CartesianChartWidget extends StatefulWidget {
     this.barSeries = const [],
     this.backgroundColor,
     this.tooltip,
+    this.syncId,
+    this.syncMethod = SyncMethod.byIndex,
     this.animationDuration = const Duration(milliseconds: 300),
     this.animationEasing = ease,
     this.isAnimationActive = true,
@@ -109,6 +168,8 @@ class _CartesianChartWidgetState extends State<CartesianChartWidget> {
           barSeries: widget.barSeries,
           backgroundColor: widget.backgroundColor,
           tooltip: widget.tooltip,
+          syncId: widget.syncId,
+          syncMethod: widget.syncMethod,
           animationDuration: widget.animationDuration,
           animationEasing: widget.animationEasing,
           isAnimationActive: widget.isAnimationActive,
@@ -143,6 +204,8 @@ class _ChartContent extends StatefulWidget {
   final List<BarSeries> barSeries;
   final Color? backgroundColor;
   final ChartTooltip? tooltip;
+  final String? syncId;
+  final SyncMethod syncMethod;
   final Duration animationDuration;
   final Curve animationEasing;
   final bool isAnimationActive;
@@ -162,6 +225,8 @@ class _ChartContent extends StatefulWidget {
     required this.barSeries,
     this.backgroundColor,
     this.tooltip,
+    this.syncId,
+    required this.syncMethod,
     required this.animationDuration,
     required this.animationEasing,
     required this.isAnimationActive,
@@ -191,10 +256,58 @@ class _ChartContentState extends State<_ChartContent>
 
   bool _isFirstBuild = true;
 
+  VoidCallback? _syncUnsubscribe;
+  final String _chartId = UniqueKey().toString();
+
   @override
   void initState() {
     super.initState();
     _initAnimationController();
+    _registerSync();
+  }
+
+  void _registerSync() {
+    if (widget.syncId != null) {
+      _syncUnsubscribe = ChartSyncBus.instance.register(
+        widget.syncId!,
+        _handleSyncUpdate,
+      );
+    }
+  }
+
+  void _unregisterSync() {
+    _syncUnsubscribe?.call();
+    _syncUnsubscribe = null;
+  }
+
+  void _handleSyncUpdate(SyncHoverPayload? payload) {
+    if (payload?.sourceChartId == _chartId) return;
+
+    if (payload == null) {
+      setState(() {
+        _interactionState = ChartInteractionState.inactive;
+      });
+    } else if (payload.index != null) {
+      _handleSyncedHover(payload.index!);
+    }
+  }
+
+  void _handleSyncedHover(int index) {
+    if (_controller == null) return;
+
+    final payload = _controller!.buildTooltipPayload(
+      index,
+      _interactionState.activeCoordinate ?? Offset.zero,
+    );
+
+    setState(() {
+      _interactionState = ChartInteractionState(
+        isActive: true,
+        activeIndex: index,
+        activeCoordinate: _interactionState.activeCoordinate,
+        tooltipPayload: payload,
+      );
+    });
   }
 
   void _initAnimationController() {
@@ -231,11 +344,17 @@ class _ChartContentState extends State<_ChartContent>
       _animationController?.curve = widget.animationEasing;
     }
 
+    if (widget.syncId != oldWidget.syncId) {
+      _unregisterSync();
+      _registerSync();
+    }
+
     _controller = null;
   }
 
   @override
   void dispose() {
+    _unregisterSync();
     _animationController?.dispose();
     super.dispose();
   }
@@ -244,6 +363,17 @@ class _ChartContentState extends State<_ChartContent>
     setState(() {
       _interactionState = state;
     });
+
+    if (widget.syncId != null && state.isActive && state.activeIndex != null) {
+      ChartSyncBus.instance.notifyHover(SyncHoverPayload(
+        syncId: widget.syncId!,
+        index: state.activeIndex,
+        coordinate: state.activeCoordinate,
+        sourceChartId: _chartId,
+      ));
+    } else if (widget.syncId != null && !state.isActive) {
+      ChartSyncBus.instance.clearHover(widget.syncId!, sourceChartId: _chartId);
+    }
   }
 
   void _triggerAnimation() {

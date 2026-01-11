@@ -54,6 +54,8 @@ export 'src/state/controllers/chart_animation_controller.dart';
 export 'src/state/controllers/polar_hit_testing.dart';
 export 'src/state/legend_state.dart';
 export 'src/state/brush_state.dart';
+export 'src/state/sync/chart_sync_bus.dart';
+export 'src/state/z_index.dart';
 
 // Scatter
 export 'src/cartesian/series/scatter_series.dart';
