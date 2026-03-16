@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/rendering.dart';
 
 import '../series/line_series.dart';
+import 'dashed_polyline.dart';
 import '../../state/models/computed_data.dart';
 import '../../core/animation/geometry_interpolation.dart';
 
@@ -46,11 +47,15 @@ class AnimatedLineSeriesPainter {
         .map((p) => p.offset)
         .toList();
 
-    return interpolatePoints(previousOffsets, currentOffsets, animationProgress);
+    return interpolatePoints(
+      previousOffsets,
+      currentOffsets,
+      animationProgress,
+    );
   }
 
   void _paintLine(Canvas canvas, List<Offset> points) {
-    if (points.isEmpty) return;
+    if (points.length < 2) return;
 
     final paint = Paint()
       ..color = series.stroke
@@ -58,6 +63,11 @@ class AnimatedLineSeriesPainter {
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
+
+    if (series.strokeDasharray != null && series.strokeDasharray!.isNotEmpty) {
+      drawDashedPolyline(canvas, points, paint, series.strokeDasharray!);
+      return;
+    }
 
     final path = Path();
     path.moveTo(points.first.dx, points.first.dy);
@@ -82,9 +92,9 @@ class AnimatedLineSeriesPainter {
 
     final strokePaint = stroke != null
         ? (Paint()
-          ..color = stroke
-          ..strokeWidth = strokeWidth
-          ..style = PaintingStyle.stroke)
+            ..color = stroke
+            ..strokeWidth = strokeWidth
+            ..style = PaintingStyle.stroke)
         : null;
 
     for (final point in points) {

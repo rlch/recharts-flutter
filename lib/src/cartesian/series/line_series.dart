@@ -21,6 +21,7 @@ class LineSeries {
   final String? name;
   final Color stroke;
   final double strokeWidth;
+  final List<double>? strokeDasharray;
   final CurveType curveType;
   final bool connectNulls;
   final bool dot;
@@ -40,6 +41,7 @@ class LineSeries {
     this.name,
     this.stroke = const Color(0xFF8884d8),
     this.strokeWidth = 2,
+    this.strokeDasharray,
     this.curveType = CurveType.linear,
     this.connectNulls = false,
     this.dot = true,
@@ -60,6 +62,7 @@ class LineSeries {
     String? name,
     Color? stroke,
     double? strokeWidth,
+    List<double>? strokeDasharray,
     CurveType? curveType,
     bool? connectNulls,
     bool? dot,
@@ -79,6 +82,7 @@ class LineSeries {
       name: name ?? this.name,
       stroke: stroke ?? this.stroke,
       strokeWidth: strokeWidth ?? this.strokeWidth,
+      strokeDasharray: strokeDasharray ?? this.strokeDasharray,
       curveType: curveType ?? this.curveType,
       connectNulls: connectNulls ?? this.connectNulls,
       dot: dot ?? this.dot,

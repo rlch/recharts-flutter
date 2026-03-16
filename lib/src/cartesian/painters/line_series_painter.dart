@@ -3,16 +3,14 @@ import 'dart:ui';
 import 'package:flutter/rendering.dart';
 
 import '../series/line_series.dart';
+import 'dashed_polyline.dart';
 import '../../state/models/computed_data.dart';
 
 class LineSeriesPainter {
   final LineSeries series;
   final List<LinePoint> points;
 
-  LineSeriesPainter({
-    required this.series,
-    required this.points,
-  });
+  LineSeriesPainter({required this.series, required this.points});
 
   void paint(Canvas canvas, Size size) {
     if (series.hide || points.isEmpty) return;
@@ -32,28 +30,48 @@ class LineSeriesPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final path = Path();
-    bool started = false;
+    final segments = _buildSegments();
+    if (segments.isEmpty) return;
 
-    for (int i = 0; i < points.length; i++) {
-      final point = points[i];
+    if (series.strokeDasharray != null && series.strokeDasharray!.isNotEmpty) {
+      for (final segment in segments) {
+        drawDashedPolyline(canvas, segment, paint, series.strokeDasharray!);
+      }
+      return;
+    }
 
+    for (final segment in segments) {
+      final path = Path()..moveTo(segment.first.dx, segment.first.dy);
+      for (int i = 1; i < segment.length; i++) {
+        path.lineTo(segment[i].dx, segment[i].dy);
+      }
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  List<List<Offset>> _buildSegments() {
+    final segments = <List<Offset>>[];
+    var currentSegment = <Offset>[];
+
+    for (final point in points) {
       if (point.isNull) {
         if (!series.connectNulls) {
-          started = false;
+          if (currentSegment.length > 1) {
+            segments.add(currentSegment);
+          }
+          currentSegment = <Offset>[];
         }
         continue;
       }
 
-      if (!started) {
-        path.moveTo(point.x, point.y);
-        started = true;
-      } else {
-        path.lineTo(point.x, point.y);
-      }
+      currentSegment.add(point.offset);
     }
 
-    canvas.drawPath(path, paint);
+    if (currentSegment.length > 1) {
+      segments.add(currentSegment);
+    }
+
+    return segments;
   }
 
   void _paintDots(Canvas canvas) {
@@ -69,9 +87,9 @@ class LineSeriesPainter {
 
     final strokePaint = stroke != null
         ? (Paint()
-          ..color = stroke
-          ..strokeWidth = strokeWidth
-          ..style = PaintingStyle.stroke)
+            ..color = stroke
+            ..strokeWidth = strokeWidth
+            ..style = PaintingStyle.stroke)
         : null;
 
     for (final point in points) {
