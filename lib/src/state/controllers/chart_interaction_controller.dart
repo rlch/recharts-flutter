@@ -64,12 +64,23 @@ class ChartInteractionController {
       return;
     }
 
-    final payload = buildTooltipPayload(index, position);
+    final anchor = getTooltipAnchorCoordinate(index);
+    if (anchor == null) {
+      onPointerExit();
+      return;
+    }
+
+    final payload = buildTooltipPayload(index, anchor);
+    if (payload.isEmpty) {
+      onPointerExit();
+      return;
+    }
+
     _updateState(
       ChartInteractionState(
         isActive: true,
         activeIndex: index,
-        activeCoordinate: position,
+        activeCoordinate: anchor,
         tooltipPayload: payload,
       ),
     );
@@ -85,12 +96,23 @@ class ChartInteractionController {
       return;
     }
 
-    final payload = buildTooltipPayload(index, position);
+    final anchor = getTooltipAnchorCoordinate(index);
+    if (anchor == null) {
+      onPointerExit();
+      return;
+    }
+
+    final payload = buildTooltipPayload(index, anchor);
+    if (payload.isEmpty) {
+      onPointerExit();
+      return;
+    }
+
     _updateState(
       ChartInteractionState(
         isActive: true,
         activeIndex: index,
-        activeCoordinate: position,
+        activeCoordinate: anchor,
         tooltipPayload: payload,
       ),
     );
@@ -227,6 +249,17 @@ class ChartInteractionController {
       entries: entries,
       coordinate: coordinate,
     );
+  }
+
+  Offset? getTooltipAnchorCoordinate(int index) {
+    for (final seriesInfo in seriesInfoList) {
+      final point = getPointCoordinate(index, seriesInfo.dataKey);
+      if (point != null) {
+        return point;
+      }
+    }
+
+    return null;
   }
 
   Offset? getPointCoordinate(int index, String dataKey) {

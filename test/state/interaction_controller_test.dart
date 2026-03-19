@@ -239,6 +239,10 @@ void main() {
         expect(capturedState!.isActive, true);
         expect(capturedState!.activeIndex, isNotNull);
         expect(capturedState!.tooltipPayload, isNotNull);
+        expect(
+          capturedState!.activeCoordinate,
+          controller.getTooltipAnchorCoordinate(capturedState!.activeIndex!),
+        );
       });
 
       test('calls onPointerExit when pointer leaves plot area', () {
@@ -337,6 +341,27 @@ void main() {
         expect(coord, isNotNull);
         expect(coord!.dx, verticalXScale(100));
         expect(coord.dy, verticalYScale('A') + (verticalYScale.bandwidth / 2));
+      });
+    });
+
+    group('getTooltipAnchorCoordinate', () {
+      test('returns first non-null series coordinate', () {
+        final controller = createController();
+
+        final coord = controller.getTooltipAnchorCoordinate(0);
+
+        expect(coord, controller.getPointCoordinate(0, 'value'));
+      });
+
+      test('returns null when no series has a value at index', () {
+        final dataWithNulls = ChartDataSet([
+          {'name': 'A', 'value': null, 'value2': null},
+        ]);
+
+        final controller = createController(data: dataWithNulls);
+
+        final coord = controller.getTooltipAnchorCoordinate(0);
+        expect(coord, isNull);
       });
     });
 

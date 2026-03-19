@@ -307,16 +307,27 @@ class _ChartContentState extends State<_ChartContent>
   void _handleSyncedHover(int index) {
     if (_controller == null) return;
 
-    final payload = _controller!.buildTooltipPayload(
-      index,
-      _interactionState.activeCoordinate ?? Offset.zero,
-    );
+    final anchor = _controller!.getTooltipAnchorCoordinate(index);
+    if (anchor == null) {
+      setState(() {
+        _interactionState = ChartInteractionState.inactive;
+      });
+      return;
+    }
+
+    final payload = _controller!.buildTooltipPayload(index, anchor);
+    if (payload.isEmpty) {
+      setState(() {
+        _interactionState = ChartInteractionState.inactive;
+      });
+      return;
+    }
 
     setState(() {
       _interactionState = ChartInteractionState(
         isActive: true,
         activeIndex: index,
-        activeCoordinate: _interactionState.activeCoordinate,
+        activeCoordinate: anchor,
         tooltipPayload: payload,
       );
     });
