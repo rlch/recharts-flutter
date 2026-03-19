@@ -9,8 +9,8 @@ class VerticalLineChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return CartesianChartWidget(
       data: pageData,
-      xAxes: const [XAxis()],
-      yAxes: const [YAxis(dataKey: 'name')],
+      xAxes: const [XAxis(type: ScaleType.linear)],
+      yAxes: const [YAxis(dataKey: 'name', type: ScaleType.category)],
       grid: const CartesianGrid(
         horizontal: true,
         vertical: true,
@@ -38,8 +38,8 @@ class VerticalLineChart extends StatelessWidget {
 CartesianChartWidget(
   data: pageData,
   // For vertical layout, configure axes appropriately
-  xAxes: const [XAxis()],
-  yAxes: const [YAxis(dataKey: 'name')],
+  xAxes: const [XAxis(type: ScaleType.linear)],
+  yAxes: const [YAxis(dataKey: 'name', type: ScaleType.category)],
   grid: const CartesianGrid(
     horizontal: true,
     vertical: true,

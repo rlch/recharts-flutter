@@ -16,10 +16,7 @@ void main() {
     {'name': 'D', 'value': 300, 'value2': 90},
   ]);
 
-  final layout = ChartLayout.compute(
-    width: 400,
-    height: 300,
-  );
+  final layout = ChartLayout.compute(width: 400, height: 300);
 
   group('buildCartesianScales', () {
     test('creates category X scale for default XAxis', () {
@@ -132,6 +129,38 @@ void main() {
 
       final scale = scales.getYScale('nonexistent');
       expect(scale, scales.yScale);
+    });
+
+    test('creates vertical layout scales for linear X and category Y', () {
+      final scales = buildCartesianScales(
+        data: testData,
+        layout: layout,
+        xAxes: [const XAxis(type: ScaleType.linear)],
+        yAxes: [const YAxis(dataKey: 'name', type: ScaleType.category)],
+        yDataKeys: ['value', 'value2'],
+      );
+
+      expect(scales.xScale, isA<LinearScale>());
+      expect(scales.xScale.domain.first, 0);
+      expect(scales.xScale.domain.last, greaterThanOrEqualTo(300));
+      expect(scales.yScale, isA<BandScale>());
+      expect(scales.yScale.domain, ['A', 'B', 'C', 'D']);
+      expect(scales.yScale.range.first, layout.plotTop);
+      expect(scales.yScale.range.last, layout.plotBottom);
+    });
+
+    test('vertical category Y keeps top-to-bottom order', () {
+      final scales = buildCartesianScales(
+        data: testData,
+        layout: layout,
+        xAxes: [const XAxis(type: ScaleType.linear)],
+        yAxes: [const YAxis(dataKey: 'name', type: ScaleType.category)],
+        yDataKeys: ['value'],
+      );
+
+      expect(scales.yScale('A'), lessThan(scales.yScale('B')));
+      expect(scales.yScale('B'), lessThan(scales.yScale('C')));
+      expect(scales.yScale('C'), lessThan(scales.yScale('D')));
     });
   });
 }

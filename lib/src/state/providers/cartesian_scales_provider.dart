@@ -43,14 +43,14 @@ class CartesianScalesParams {
 
 final cartesianScalesProvider =
     Provider.family<CartesianScales, CartesianScalesParams>((ref, params) {
-  return buildCartesianScales(
-    data: params.data,
-    layout: params.layout,
-    xAxes: params.xAxes,
-    yAxes: params.yAxes,
-    yDataKeys: params.yDataKeys,
-  );
-});
+      return buildCartesianScales(
+        data: params.data,
+        layout: params.layout,
+        xAxes: params.xAxes,
+        yAxes: params.yAxes,
+        yDataKeys: params.yDataKeys,
+      );
+    });
 
 CartesianScales buildCartesianScales({
   required ChartDataSet data,
@@ -67,6 +67,7 @@ CartesianScales buildCartesianScales({
     xAxis: xAxis,
     plotLeft: layout.plotLeft,
     plotRight: layout.plotRight,
+    yDataKeys: yDataKeys,
   );
 
   final yScale = _buildYScale(
@@ -86,6 +87,7 @@ CartesianScales buildCartesianScales({
       xAxis: axis,
       plotLeft: layout.plotLeft,
       plotRight: layout.plotRight,
+      yDataKeys: yDataKeys,
     );
   }
 
@@ -112,6 +114,7 @@ Scale<dynamic, double> _buildXScale({
   required XAxis xAxis,
   required double plotLeft,
   required double plotRight,
+  required List<String> yDataKeys,
 }) {
   final dataKey = xAxis.dataKey;
   final isCategory =
@@ -138,16 +141,32 @@ Scale<dynamic, double> _buildXScale({
     );
   }
 
-  final extent = dataKey != null ? data.getExtent(dataKey) : null;
-  final domainMin = (xAxis.domain?.firstOrNull as num?)?.toDouble() ??
-      extent?.$1 ??
-      0;
-  final domainMax = (xAxis.domain?.lastOrNull as num?)?.toDouble() ??
-      extent?.$2 ??
-      1;
+  double? minValue;
+  double? maxValue;
+
+  if (dataKey != null) {
+    final extent = data.getExtent(dataKey);
+    if (extent != null) {
+      minValue = extent.$1;
+      maxValue = extent.$2;
+    }
+  } else {
+    for (final key in yDataKeys) {
+      final extent = data.getExtent(key);
+      if (extent == null) continue;
+      minValue = minValue == null ? extent.$1 : math.min(minValue, extent.$1);
+      maxValue = maxValue == null ? extent.$2 : math.max(maxValue, extent.$2);
+    }
+  }
+
+  final domainMin =
+      (xAxis.domain?.firstOrNull as num?)?.toDouble() ?? minValue ?? 0;
+  final domainMax =
+      (xAxis.domain?.lastOrNull as num?)?.toDouble() ?? maxValue ?? 1;
+  final adjustedMin = (dataKey == null && domainMin > 0) ? 0.0 : domainMin;
 
   return LinearScale(
-    domain: [domainMin, domainMax],
+    domain: [adjustedMin, domainMax],
     range: xAxis.reversed ? [plotRight, plotLeft] : [plotLeft, plotRight],
     nice: true,
   );
@@ -160,35 +179,54 @@ Scale<dynamic, double> _buildYScale({
   required double plotBottom,
   required List<String> yDataKeys,
 }) {
+  final isCategory =
+      yAxis.type == ScaleType.category || yAxis.type == ScaleType.band;
+  final isPoint = yAxis.type == ScaleType.point;
+
+  if (isCategory || isPoint) {
+    final domain = yAxis.dataKey != null
+        ? data.getUniqueValues<dynamic>(yAxis.dataKey!)
+        : List.generate(data.length, (i) => i);
+
+    final range = yAxis.reversed
+        ? [plotBottom, plotTop]
+        : [plotTop, plotBottom];
+
+    if (isPoint) {
+      return PointScale(domain: domain, range: range);
+    }
+
+    return BandScale(
+      domain: domain,
+      range: range,
+      paddingInner: 0.1,
+      paddingOuter: 0.1,
+    );
+  }
+
   double? minValue;
   double? maxValue;
 
   for (final key in yDataKeys) {
     final extent = data.getExtent(key);
     if (extent != null) {
-      minValue =
-          minValue == null ? extent.$1 : math.min(minValue, extent.$1);
-      maxValue =
-          maxValue == null ? extent.$2 : math.max(maxValue, extent.$2);
+      minValue = minValue == null ? extent.$1 : math.min(minValue, extent.$1);
+      maxValue = maxValue == null ? extent.$2 : math.max(maxValue, extent.$2);
     }
   }
 
   if (yAxis.dataKey != null) {
     final extent = data.getExtent(yAxis.dataKey!);
     if (extent != null) {
-      minValue =
-          minValue == null ? extent.$1 : math.min(minValue, extent.$1);
-      maxValue =
-          maxValue == null ? extent.$2 : math.max(maxValue, extent.$2);
+      minValue = minValue == null ? extent.$1 : math.min(minValue, extent.$1);
+      maxValue = maxValue == null ? extent.$2 : math.max(maxValue, extent.$2);
     }
   }
 
-  final domainMin = (yAxis.domain?.firstOrNull as num?)?.toDouble() ??
-      minValue ??
-      0;
-  final domainMax = (yAxis.domain?.lastOrNull as num?)?.toDouble() ??
-      maxValue ??
-      1;
+  final domainMin =
+      (yAxis.domain?.firstOrNull as num?)?.toDouble() ?? minValue ?? 0;
+  final domainMax =
+      (yAxis.domain?.lastOrNull as num?)?.toDouble() ?? maxValue ?? 1;
 
   final adjustedMin = domainMin > 0 ? 0.0 : domainMin;
 

@@ -20,10 +20,7 @@ void main() {
       range: [0, 400],
     );
 
-    final yScale = LinearScale(
-      domain: [0, 300],
-      range: [300, 0],
-    );
+    final yScale = LinearScale(domain: [0, 300], range: [300, 0]);
 
     const baseY = 300.0;
 
@@ -105,6 +102,30 @@ void main() {
       );
 
       expect(points[1].isNull, true);
+    });
+
+    test('supports vertical layout area points', () {
+      final verticalYScale = BandScale<String>(
+        domain: ['A', 'B', 'C', 'D'],
+        range: [0, 400],
+      );
+      final verticalXScale = LinearScale(domain: [0, 300], range: [0, 600]);
+
+      final points = computeAreaPoints(
+        data: testData,
+        series: const AreaSeries(dataKey: 'value'),
+        xScale: verticalXScale,
+        yScale: verticalYScale,
+        yDataKey: 'name',
+        baseX: verticalXScale(0),
+        verticalLayout: true,
+      );
+
+      final yBandwidth = verticalYScale.bandwidth;
+      expect(points[0].x, verticalXScale(100));
+      expect(points[0].y, verticalYScale('A') + yBandwidth / 2);
+      expect(points[0].bottomOffset.dx, verticalXScale(0));
+      expect(points[0].bottomOffset.dy, points[0].y);
     });
   });
 }

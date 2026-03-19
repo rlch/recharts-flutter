@@ -33,6 +33,8 @@ class ChartInteractionController {
   final Scale<dynamic, double> xScale;
   final Scale<dynamic, double> yScale;
   final String xDataKey;
+  final String categoryDataKey;
+  final bool verticalLayout;
   final List<SeriesInfo> seriesInfoList;
   final InteractionStateCallback onStateChanged;
 
@@ -42,9 +44,11 @@ class ChartInteractionController {
     required this.xScale,
     required this.yScale,
     required this.xDataKey,
+    String? categoryDataKey,
+    this.verticalLayout = false,
     required this.seriesInfoList,
     required this.onStateChanged,
-  });
+  }) : categoryDataKey = categoryDataKey ?? xDataKey;
 
   ChartInteractionState _state = ChartInteractionState.inactive;
   ChartInteractionState get state => _state;
@@ -61,12 +65,14 @@ class ChartInteractionController {
     }
 
     final payload = buildTooltipPayload(index, position);
-    _updateState(ChartInteractionState(
-      isActive: true,
-      activeIndex: index,
-      activeCoordinate: position,
-      tooltipPayload: payload,
-    ));
+    _updateState(
+      ChartInteractionState(
+        isActive: true,
+        activeIndex: index,
+        activeCoordinate: position,
+        tooltipPayload: payload,
+      ),
+    );
   }
 
   void onPointerTap(Offset position) {
@@ -80,12 +86,14 @@ class ChartInteractionController {
     }
 
     final payload = buildTooltipPayload(index, position);
-    _updateState(ChartInteractionState(
-      isActive: true,
-      activeIndex: index,
-      activeCoordinate: position,
-      tooltipPayload: payload,
-    ));
+    _updateState(
+      ChartInteractionState(
+        isActive: true,
+        activeIndex: index,
+        activeCoordinate: position,
+        tooltipPayload: payload,
+      ),
+    );
   }
 
   void onPointerExit() {
@@ -106,24 +114,42 @@ class ChartInteractionController {
   }
 
   int? findNearestIndex(Offset position) {
+    if (verticalLayout) {
+      final bandwidth = yScale.bandwidth;
+
+      if (bandwidth != null && bandwidth > 0) {
+        return _findBandIndex(yScale, position.dy);
+      }
+
+      return _findNearestIndexByDataKey(
+        position.dy,
+        scale: yScale,
+        dataKey: categoryDataKey,
+      );
+    }
+
     final bandwidth = xScale.bandwidth;
 
     if (bandwidth != null && bandwidth > 0) {
-      return _findBandIndex(position.dx);
-    } else {
-      return _findNearestNumericIndex(position.dx);
+      return _findBandIndex(xScale, position.dx);
     }
+
+    return _findNearestIndexByDataKey(
+      position.dx,
+      scale: xScale,
+      dataKey: xDataKey,
+    );
   }
 
-  int? _findBandIndex(double x) {
-    final ticks = xScale.ticks();
+  int? _findBandIndex(Scale<dynamic, double> scale, double value) {
+    final ticks = scale.ticks();
     if (ticks.isEmpty) return null;
 
-    final bandwidth = xScale.bandwidth ?? 0;
+    final bandwidth = scale.bandwidth ?? 0;
 
     for (int i = 0; i < ticks.length; i++) {
-      final tickX = xScale(ticks[i]);
-      if (x >= tickX && x <= tickX + bandwidth) {
+      final tickValue = scale(ticks[i]);
+      if (value >= tickValue && value <= tickValue + bandwidth) {
         return i;
       }
     }
@@ -132,8 +158,8 @@ class ChartInteractionController {
     int nearestIndex = 0;
 
     for (int i = 0; i < ticks.length; i++) {
-      final tickX = xScale(ticks[i]) + bandwidth / 2;
-      final distance = (x - tickX).abs();
+      final tickValue = scale(ticks[i]) + bandwidth / 2;
+      final distance = (value - tickValue).abs();
       if (distance < minDistance) {
         minDistance = distance;
         nearestIndex = i;
@@ -143,19 +169,28 @@ class ChartInteractionController {
     return nearestIndex;
   }
 
-  int? _findNearestNumericIndex(double x) {
+  int? _findNearestIndexByDataKey(
+    double value, {
+    required Scale<dynamic, double> scale,
+    required String dataKey,
+  }) {
     if (data.isEmpty) return null;
 
     double minDistance = double.infinity;
     int nearestIndex = 0;
+    bool found = false;
 
     for (int i = 0; i < data.length; i++) {
       final point = data[i];
-      final xValue = point[xDataKey];
-      if (xValue == null) continue;
+      final scaledValueRaw = point[dataKey];
+      if (scaledValueRaw == null) continue;
 
-      final pointX = xScale(xValue);
-      final distance = (x - pointX).abs();
+      final scaledValue = scale(scaledValueRaw) + (scale.bandwidth ?? 0) / 2;
+      if (scaledValue.isNaN) continue;
+
+      final distance = (value - scaledValue).abs();
+
+      found = true;
 
       if (distance < minDistance) {
         minDistance = distance;
@@ -163,24 +198,26 @@ class ChartInteractionController {
       }
     }
 
-    return nearestIndex;
+    return found ? nearestIndex : null;
   }
 
   TooltipPayload buildTooltipPayload(int index, Offset coordinate) {
     final point = data[index];
-    final label = point.getStringValue(xDataKey) ?? 'Index $index';
+    final label = point.getStringValue(categoryDataKey) ?? 'Index $index';
 
     final entries = <TooltipEntry>[];
 
     for (final seriesInfo in seriesInfoList) {
       final value = point[seriesInfo.dataKey];
       if (value != null) {
-        entries.add(TooltipEntry(
-          name: seriesInfo.displayName,
-          value: value,
-          color: seriesInfo.color,
-          unit: seriesInfo.unit,
-        ));
+        entries.add(
+          TooltipEntry(
+            name: seriesInfo.displayName,
+            value: value,
+            color: seriesInfo.color,
+            unit: seriesInfo.unit,
+          ),
+        );
       }
     }
 
@@ -196,13 +233,25 @@ class ChartInteractionController {
     if (index < 0 || index >= data.length) return null;
 
     final point = data[index];
-    final xValue = point[xDataKey];
-    final yValue = point.getNumericValue(dataKey);
+    final numericValue = point.getNumericValue(dataKey);
+    if (numericValue == null) return null;
 
-    if (xValue == null || yValue == null) return null;
+    if (verticalLayout) {
+      final categoryValue = point[categoryDataKey];
+      if (categoryValue == null) return null;
+
+      final x = xScale(numericValue);
+      final y = yScale(categoryValue) + (yScale.bandwidth ?? 0) / 2;
+
+      return Offset(x, y);
+    }
+
+    final xValue = point[xDataKey];
+
+    if (xValue == null) return null;
 
     final x = xScale(xValue) + (xScale.bandwidth ?? 0) / 2;
-    final y = yScale(yValue);
+    final y = yScale(numericValue);
 
     return Offset(x, y);
   }

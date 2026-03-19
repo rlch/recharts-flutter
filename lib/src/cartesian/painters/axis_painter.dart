@@ -112,11 +112,7 @@ class AxisPainter {
       final tickStart = isTop ? axisPosition - tickSize : axisPosition;
       final tickEnd = isTop ? axisPosition : axisPosition + tickSize;
 
-      canvas.drawLine(
-        Offset(x, tickStart),
-        Offset(x, tickEnd),
-        axisPaint,
-      );
+      canvas.drawLine(Offset(x, tickStart), Offset(x, tickEnd), axisPaint);
 
       final label = _formatLabel(tick);
       final textPainter = TextPainter(
@@ -132,10 +128,7 @@ class AxisPainter {
           ? axisPosition - tickSize - tickMargin - textPainter.height
           : axisPosition + tickSize + tickMargin;
 
-      textPainter.paint(
-        canvas,
-        Offset(x - textPainter.width / 2, labelY),
-      );
+      textPainter.paint(canvas, Offset(x - textPainter.width / 2, labelY));
     }
   }
 
@@ -147,19 +140,17 @@ class AxisPainter {
     );
 
     final ticks = scale.ticks(tickCount);
+    final bandwidth = scale.bandwidth ?? 0;
+    final yOffset = bandwidth / 2;
 
     for (final tick in ticks) {
-      final y = scale(tick);
+      final y = scale(tick) + yOffset;
       if (y < plotStart || y > plotEnd) continue;
 
       final tickStart = isLeft ? axisPosition - tickSize : axisPosition;
       final tickEnd = isLeft ? axisPosition : axisPosition + tickSize;
 
-      canvas.drawLine(
-        Offset(tickStart, y),
-        Offset(tickEnd, y),
-        axisPaint,
-      );
+      canvas.drawLine(Offset(tickStart, y), Offset(tickEnd, y), axisPaint);
 
       final label = _formatLabel(tick);
       final textPainter = TextPainter(
@@ -175,10 +166,7 @@ class AxisPainter {
           ? axisPosition - tickSize - tickMargin - textPainter.width
           : axisPosition + tickSize + tickMargin;
 
-      textPainter.paint(
-        canvas,
-        Offset(labelX, y - textPainter.height / 2),
-      );
+      textPainter.paint(canvas, Offset(labelX, y - textPainter.height / 2));
     }
   }
 
