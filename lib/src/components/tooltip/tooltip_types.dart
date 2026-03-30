@@ -5,15 +5,23 @@ class TooltipEntry {
   final dynamic value;
   final Color color;
   final String? unit;
+  final double? percentValue;
+  final bool usePercentTooltipLabel;
 
   const TooltipEntry({
     required this.name,
     required this.value,
     required this.color,
     this.unit,
+    this.percentValue,
+    this.usePercentTooltipLabel = false,
   });
 
   String get formattedValue {
+    if (usePercentTooltipLabel && percentValue != null) {
+      return '${(percentValue! * 100).toStringAsFixed(0)}%';
+    }
+
     if (value == null) return '';
     if (value is double) {
       return value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2);
@@ -21,8 +29,14 @@ class TooltipEntry {
     return value.toString();
   }
 
+  String? get formattedPercentValue {
+    if (percentValue == null) return null;
+    return '${(percentValue! * 100).toStringAsFixed(0)}%';
+  }
+
   @override
-  String toString() => 'TooltipEntry(name: $name, value: $value, color: $color)';
+  String toString() =>
+      'TooltipEntry(name: $name, value: $value, color: $color)';
 }
 
 class TooltipPayload {
@@ -46,11 +60,7 @@ class TooltipPayload {
       'TooltipPayload(index: $index, label: $label, entries: $entries)';
 }
 
-enum TooltipTrigger {
-  hover,
-  click,
-  none,
-}
+enum TooltipTrigger { hover, click, none }
 
 class CursorConfig {
   final bool show;

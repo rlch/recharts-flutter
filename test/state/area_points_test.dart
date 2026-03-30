@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:recharts_flutter/src/core/types/chart_data.dart';
 import 'package:recharts_flutter/src/core/scale/band_scale.dart';
 import 'package:recharts_flutter/src/core/scale/linear_scale.dart';
+import 'package:recharts_flutter/src/core/types/series_types.dart';
 import 'package:recharts_flutter/src/cartesian/series/area_series.dart';
 import 'package:recharts_flutter/src/state/providers/area_points_provider.dart';
 
@@ -126,6 +127,40 @@ void main() {
       expect(points[0].y, verticalYScale('A') + yBandwidth / 2);
       expect(points[0].bottomOffset.dx, verticalXScale(0));
       expect(points[0].bottomOffset.dy, points[0].y);
+    });
+
+    test('computes expanded stacked area points as percentages', () {
+      final stackedData = ChartDataSet([
+        {'name': 'A', 'uv': 100, 'pv': 300},
+        {'name': 'B', 'uv': 200, 'pv': 200},
+      ]);
+
+      final scale = LinearScale(domain: [0, 1], range: [300, 0]);
+      final bandScale = BandScale<String>(domain: ['A', 'B'], range: [0, 200]);
+
+      final pointsMap = computeStackedAreaPointsMap(
+        data: stackedData,
+        areaSeries: const [
+          AreaSeries(dataKey: 'uv', stackId: 's'),
+          AreaSeries(dataKey: 'pv', stackId: 's'),
+        ],
+        xScale: bandScale,
+        yScale: scale,
+        xDataKey: 'name',
+        stackOffset: StackOffsetType.expand,
+      );
+
+      final uvPoints = pointsMap['uv']!;
+      final pvPoints = pointsMap['pv']!;
+
+      expect(scale.invert(uvPoints[0].y), closeTo(0.25, 1e-6));
+      expect(scale.invert(uvPoints[0].baseY), closeTo(0.0, 1e-6));
+      expect(scale.invert(pvPoints[0].y), closeTo(1.0, 1e-6));
+      expect(scale.invert(pvPoints[0].baseY), closeTo(0.25, 1e-6));
+
+      expect(scale.invert(uvPoints[1].y), closeTo(0.5, 1e-6));
+      expect(scale.invert(pvPoints[1].y), closeTo(1.0, 1e-6));
+      expect(scale.invert(pvPoints[1].baseY), closeTo(0.5, 1e-6));
     });
   });
 }

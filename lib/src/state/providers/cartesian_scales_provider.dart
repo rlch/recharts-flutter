@@ -8,8 +8,10 @@ import '../../core/scale/point_scale.dart';
 import '../../core/scale/scale.dart';
 import '../../core/types/axis_types.dart';
 import '../../core/types/chart_data.dart';
+import '../../core/types/series_types.dart';
 import '../../cartesian/axis/x_axis.dart';
 import '../../cartesian/axis/y_axis.dart';
+import '../../cartesian/series/area_series.dart';
 import '../models/chart_layout.dart';
 import '../models/cartesian_scales.dart';
 
@@ -19,6 +21,8 @@ class CartesianScalesParams {
   final List<XAxis> xAxes;
   final List<YAxis> yAxes;
   final List<String> yDataKeys;
+  final List<AreaSeries> areaSeries;
+  final StackOffsetType stackOffset;
 
   const CartesianScalesParams({
     required this.data,
@@ -26,6 +30,8 @@ class CartesianScalesParams {
     required this.xAxes,
     required this.yAxes,
     required this.yDataKeys,
+    this.areaSeries = const [],
+    this.stackOffset = StackOffsetType.none,
   });
 
   @override
@@ -49,6 +55,8 @@ final cartesianScalesProvider =
         xAxes: params.xAxes,
         yAxes: params.yAxes,
         yDataKeys: params.yDataKeys,
+        areaSeries: params.areaSeries,
+        stackOffset: params.stackOffset,
       );
     });
 
@@ -58,6 +66,8 @@ CartesianScales buildCartesianScales({
   required List<XAxis> xAxes,
   required List<YAxis> yAxes,
   required List<String> yDataKeys,
+  List<AreaSeries> areaSeries = const [],
+  StackOffsetType stackOffset = StackOffsetType.none,
 }) {
   final xAxis = xAxes.isNotEmpty ? xAxes.first : const XAxis();
   final yAxis = yAxes.isNotEmpty ? yAxes.first : const YAxis();
@@ -76,6 +86,8 @@ CartesianScales buildCartesianScales({
     plotTop: layout.plotTop,
     plotBottom: layout.plotBottom,
     yDataKeys: yDataKeys,
+    areaSeries: areaSeries,
+    stackOffset: stackOffset,
   );
 
   final xScales = <String, Scale<dynamic, double>>{};
@@ -98,6 +110,8 @@ CartesianScales buildCartesianScales({
       plotTop: layout.plotTop,
       plotBottom: layout.plotBottom,
       yDataKeys: yDataKeys,
+      areaSeries: areaSeries,
+      stackOffset: stackOffset,
     );
   }
 
@@ -178,6 +192,8 @@ Scale<dynamic, double> _buildYScale({
   required double plotTop,
   required double plotBottom,
   required List<String> yDataKeys,
+  required List<AreaSeries> areaSeries,
+  required StackOffsetType stackOffset,
 }) {
   final isCategory =
       yAxis.type == ScaleType.category || yAxis.type == ScaleType.band;
@@ -223,6 +239,25 @@ Scale<dynamic, double> _buildYScale({
     }
   }
 
+  final stackedExtent = _computeStackedAreaExtent(
+    data: data,
+    areaSeries: areaSeries,
+    stackOffset: stackOffset,
+  );
+  if (stackedExtent != null) {
+    minValue = minValue == null
+        ? stackedExtent.$1
+        : math.min(minValue, stackedExtent.$1);
+    maxValue = maxValue == null
+        ? stackedExtent.$2
+        : math.max(maxValue, stackedExtent.$2);
+  }
+
+  if (stackOffset == StackOffsetType.expand && areaSeries.isNotEmpty) {
+    minValue = 0;
+    maxValue = 1;
+  }
+
   final domainMin =
       (yAxis.domain?.firstOrNull as num?)?.toDouble() ?? minValue ?? 0;
   final domainMax =
@@ -233,6 +268,57 @@ Scale<dynamic, double> _buildYScale({
   return LinearScale(
     domain: [adjustedMin, domainMax],
     range: yAxis.reversed ? [plotTop, plotBottom] : [plotBottom, plotTop],
-    nice: true,
+    nice: stackOffset != StackOffsetType.expand,
   );
+}
+
+(double, double)? _computeStackedAreaExtent({
+  required ChartDataSet data,
+  required List<AreaSeries> areaSeries,
+  required StackOffsetType stackOffset,
+}) {
+  if (areaSeries.isEmpty) return null;
+
+  if (stackOffset == StackOffsetType.expand) {
+    return (0, 1);
+  }
+
+  final stackGroups = <String, List<AreaSeries>>{};
+  for (final series in areaSeries) {
+    final stackKey = series.stackId ?? '__unstacked__${series.dataKey}';
+    stackGroups.putIfAbsent(stackKey, () => <AreaSeries>[]).add(series);
+  }
+
+  double minExtent = 0;
+  double maxExtent = 0;
+  var hasValue = false;
+
+  for (final stackSeries in stackGroups.values) {
+    for (int index = 0; index < data.length; index++) {
+      double positiveSum = 0;
+      double negativeSum = 0;
+      var pointHasValue = false;
+
+      for (final series in stackSeries) {
+        final value = data[index].getNumericValue(series.dataKey);
+        if (value == null || value.isNaN) continue;
+
+        pointHasValue = true;
+        if (value >= 0) {
+          positiveSum += value;
+        } else {
+          negativeSum += value;
+        }
+      }
+
+      if (!pointHasValue) continue;
+
+      hasValue = true;
+      minExtent = math.min(minExtent, negativeSum);
+      maxExtent = math.max(maxExtent, positiveSum);
+    }
+  }
+
+  if (!hasValue) return null;
+  return (minExtent, maxExtent);
 }

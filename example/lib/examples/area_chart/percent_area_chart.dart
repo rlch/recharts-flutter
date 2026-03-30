@@ -9,8 +9,11 @@ class PercentAreaChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return CartesianChartWidget(
       data: pageData,
+      stackOffset: StackOffsetType.expand,
       xAxes: const [XAxis(dataKey: 'name')],
-      yAxes: const [YAxis()],
+      yAxes: const [
+        YAxis(domain: [0, 1], tickCount: 4)
+      ],
       grid: const CartesianGrid(
         horizontal: true,
         vertical: true,
@@ -49,9 +52,9 @@ class PercentAreaChart extends StatelessWidget {
   static const String sourceCode = '''
 CartesianChartWidget(
   data: pageData,
-  // For percent chart, use stackOffset: StackOffsetType.expand
+  stackOffset: StackOffsetType.expand,
   xAxes: const [XAxis(dataKey: 'name')],
-  yAxes: const [YAxis()],
+  yAxes: const [YAxis(domain: [0, 1], tickCount: 4)],
   grid: const CartesianGrid(strokeDasharray: [3, 3]),
   areaSeries: const [
     AreaSeries(

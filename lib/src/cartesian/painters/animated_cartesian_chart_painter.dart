@@ -15,6 +15,7 @@ import 'animated_area_series_painter.dart';
 import 'animated_bar_series_painter.dart';
 import 'cursor_painter.dart';
 import '../../core/scale/scale.dart';
+import '../../core/types/series_types.dart';
 import '../../state/models/chart_layout.dart';
 import '../../state/models/computed_data.dart';
 import '../../components/tooltip/tooltip_types.dart';
@@ -27,6 +28,7 @@ class AnimatedCartesianChartPainter extends CustomPainter {
   final List<LineSeries> lineSeries;
   final List<AreaSeries> areaSeries;
   final List<BarSeries> barSeries;
+  final StackOffsetType stackOffset;
   final List<ReferenceLine> referenceLines;
   final Scale<dynamic, double> xScale;
   final Scale<dynamic, double> yScale;
@@ -49,6 +51,7 @@ class AnimatedCartesianChartPainter extends CustomPainter {
     required this.lineSeries,
     required this.areaSeries,
     required this.barSeries,
+    this.stackOffset = StackOffsetType.none,
     this.referenceLines = const [],
     required this.xScale,
     required this.yScale,
@@ -230,7 +233,7 @@ class AnimatedCartesianChartPainter extends CustomPainter {
           : layout.plotLeft;
 
       final painter = AxisPainter.fromYAxis(
-        axis: axis,
+        axis: _buildEffectiveYAxis(axis),
         scale: yScale,
         axisX: axisX,
         plotTop: layout.plotTop,
@@ -238,6 +241,32 @@ class AnimatedCartesianChartPainter extends CustomPainter {
       );
       painter.paint(canvas, size);
     }
+  }
+
+  YAxis _buildEffectiveYAxis(YAxis axis) {
+    if (stackOffset != StackOffsetType.expand) {
+      return axis;
+    }
+
+    return axis.copyWith(
+      domain: const [0, 1],
+      tickCount: axis.tickCount ?? 4,
+      ticks: axis.ticks ?? const [0.0, 0.25, 0.5, 0.75, 1.0],
+      tickFormatter:
+          axis.tickFormatter ??
+          (value) {
+            if (value is num) {
+              final percent = value.toDouble() * 100;
+              if ((percent - percent.roundToDouble()).abs() < 1e-6) {
+                return '${percent.round()}%';
+              }
+
+              return '${percent.toStringAsFixed(1)}%';
+            }
+
+            return value.toString();
+          },
+    );
   }
 
   @override

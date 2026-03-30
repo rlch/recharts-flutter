@@ -55,6 +55,19 @@ void main() {
 
       expect(entry.formattedValue, 'Hello');
     });
+
+    test('formats tooltip as percentage when enabled', () {
+      const entry = TooltipEntry(
+        name: 'Test',
+        value: 100,
+        color: Color(0xFF8884d8),
+        percentValue: 0.375,
+        usePercentTooltipLabel: true,
+      );
+
+      expect(entry.formattedValue, '38%');
+      expect(entry.formattedPercentValue, '38%');
+    });
   });
 
   group('TooltipPayload', () {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/types/chart_data.dart';
 import '../core/types/axis_types.dart';
+import '../core/types/series_types.dart';
 import '../core/animation/easing_curves.dart';
 import 'axis/x_axis.dart';
 import 'axis/y_axis.dart';
@@ -71,6 +72,11 @@ class CartesianChartWidget extends StatefulWidget {
   /// Bar series to render.
   final List<BarSeries> barSeries;
 
+  /// Offset strategy for stacked area series.
+  ///
+  /// Use [StackOffsetType.expand] to render percentage area charts.
+  final StackOffsetType stackOffset;
+
   /// Reference lines to render.
   final List<ReferenceLine> referenceLines;
 
@@ -117,6 +123,7 @@ class CartesianChartWidget extends StatefulWidget {
     this.lineSeries = const [],
     this.areaSeries = const [],
     this.barSeries = const [],
+    this.stackOffset = StackOffsetType.none,
     this.referenceLines = const [],
     this.backgroundColor,
     this.tooltip,
@@ -175,6 +182,7 @@ class _CartesianChartWidgetState extends State<CartesianChartWidget> {
           lineSeries: widget.lineSeries,
           areaSeries: widget.areaSeries,
           barSeries: widget.barSeries,
+          stackOffset: widget.stackOffset,
           referenceLines: widget.referenceLines,
           backgroundColor: widget.backgroundColor,
           tooltip: widget.tooltip,
@@ -212,6 +220,7 @@ class _ChartContent extends StatefulWidget {
   final List<LineSeries> lineSeries;
   final List<AreaSeries> areaSeries;
   final List<BarSeries> barSeries;
+  final StackOffsetType stackOffset;
   final List<ReferenceLine> referenceLines;
   final Color? backgroundColor;
   final ChartTooltip? tooltip;
@@ -234,6 +243,7 @@ class _ChartContent extends StatefulWidget {
     required this.lineSeries,
     required this.areaSeries,
     required this.barSeries,
+    required this.stackOffset,
     required this.referenceLines,
     this.backgroundColor,
     this.tooltip,
@@ -441,6 +451,8 @@ class _ChartContentState extends State<_ChartContent>
       xAxes: effectiveXAxes,
       yAxes: effectiveYAxes,
       yDataKeys: yDataKeys,
+      areaSeries: widget.areaSeries,
+      stackOffset: widget.stackOffset,
     );
 
     final xDataKey = primaryXAxis.dataKey;
@@ -464,20 +476,18 @@ class _ChartContentState extends State<_ChartContent>
     final baseX = scales.xScale(0);
     final baseY = scales.yScale(0);
 
-    final areaPointsMap = <String, List<AreaPoint>>{};
-    for (final series in widget.areaSeries) {
-      areaPointsMap[series.dataKey] = computeAreaPoints(
-        data: widget.dataSet,
-        series: series,
-        xScale: scales.xScale,
-        yScale: scales.yScale,
-        xDataKey: xDataKey,
-        yDataKey: categoryDataKey,
-        baseX: baseX,
-        baseY: baseY,
-        verticalLayout: isVerticalLayout,
-      );
-    }
+    final areaPointsMap = computeStackedAreaPointsMap(
+      data: widget.dataSet,
+      areaSeries: widget.areaSeries,
+      xScale: scales.xScale,
+      yScale: scales.yScale,
+      xDataKey: xDataKey,
+      yDataKey: categoryDataKey,
+      baseX: baseX,
+      baseY: baseY,
+      verticalLayout: isVerticalLayout,
+      stackOffset: widget.stackOffset,
+    );
 
     final barRectsMap = <String, List<BarRect>>{};
     final totalBars = widget.barSeries.length;
@@ -522,14 +532,51 @@ class _ChartContentState extends State<_ChartContent>
         (s) => SeriesInfo(dataKey: s.dataKey, name: s.name, color: s.stroke),
       ),
       ...widget.areaSeries.map(
-        (s) => SeriesInfo(dataKey: s.dataKey, name: s.name, color: s.stroke),
+        (s) => SeriesInfo(
+          dataKey: s.dataKey,
+          name: s.name,
+          color: s.stroke,
+          pointCoordinateForIndex: (index) {
+            final areaPoint = areaPointsMap[s.dataKey];
+            if (areaPoint == null || index < 0 || index >= areaPoint.length) {
+              return null;
+            }
+
+            final point = areaPoint[index];
+            if (point.isNull || point.y.isNaN || point.x.isNaN) {
+              return null;
+            }
+
+            return point.topOffset;
+          },
+          percentValueForIndex: (index) {
+            final areaPoint = areaPointsMap[s.dataKey];
+            if (areaPoint == null || index < 0 || index >= areaPoint.length) {
+              return null;
+            }
+
+            final point = areaPoint[index];
+            if (point.isNull || point.y.isNaN || point.baseY.isNaN) {
+              return null;
+            }
+
+            final topValue = scales.yScale.invert(point.y);
+            final baseValue = scales.yScale.invert(point.baseY);
+            if (topValue is! num || baseValue is! num) {
+              return null;
+            }
+
+            final ratio = (topValue.toDouble() - baseValue.toDouble()).abs();
+            return ratio.isFinite ? ratio : null;
+          },
+        ),
       ),
       ...widget.barSeries.map(
         (s) => SeriesInfo(dataKey: s.dataKey, name: s.name, color: s.fill),
       ),
     ];
 
-    _controller ??= ChartInteractionController(
+    _controller = ChartInteractionController(
       data: widget.dataSet,
       layout: layout,
       xScale: scales.xScale,
@@ -584,6 +631,7 @@ class _ChartContentState extends State<_ChartContent>
           lineSeries: widget.lineSeries,
           areaSeries: widget.areaSeries,
           barSeries: widget.barSeries,
+          stackOffset: widget.stackOffset,
           referenceLines: widget.referenceLines,
           xScale: scales.xScale,
           yScale: scales.yScale,

@@ -1,6 +1,7 @@
 import 'package:flutter/rendering.dart';
 
 import '../../core/scale/scale.dart';
+import '../../core/types/axis_types.dart';
 import '../axis/x_axis.dart';
 import '../axis/y_axis.dart';
 
@@ -18,6 +19,8 @@ class AxisPainter {
   final double tickSize;
   final double tickMargin;
   final String? unit;
+  final AxisTickFormatter? tickFormatter;
+  final List<dynamic>? ticks;
   final bool hide;
 
   AxisPainter({
@@ -34,6 +37,8 @@ class AxisPainter {
     this.tickSize = 6,
     this.tickMargin = 3,
     this.unit,
+    this.tickFormatter,
+    this.ticks,
     this.hide = false,
   });
 
@@ -52,8 +57,10 @@ class AxisPainter {
       plotStart: plotLeft,
       plotEnd: plotRight,
       tickCount: axis.tickCount ?? 5,
+      ticks: axis.ticks,
       tickMargin: axis.tickMargin ?? 3,
       unit: axis.unit,
+      tickFormatter: axis.tickFormatter,
       hide: axis.hide,
     );
   }
@@ -73,8 +80,10 @@ class AxisPainter {
       plotStart: plotTop,
       plotEnd: plotBottom,
       tickCount: axis.tickCount ?? 5,
+      ticks: axis.ticks,
       tickMargin: axis.tickMargin ?? 3,
       unit: axis.unit,
+      tickFormatter: axis.tickFormatter,
       hide: axis.hide,
     );
   }
@@ -101,7 +110,7 @@ class AxisPainter {
       axisPaint,
     );
 
-    final ticks = scale.ticks(tickCount);
+    final ticks = this.ticks ?? scale.ticks(tickCount);
     final bandwidth = scale.bandwidth ?? 0;
     final xOffset = bandwidth / 2;
 
@@ -139,7 +148,7 @@ class AxisPainter {
       axisPaint,
     );
 
-    final ticks = scale.ticks(tickCount);
+    final ticks = this.ticks ?? scale.ticks(tickCount);
     final bandwidth = scale.bandwidth ?? 0;
     final yOffset = bandwidth / 2;
 
@@ -171,6 +180,10 @@ class AxisPainter {
   }
 
   String _formatLabel(dynamic value) {
+    if (tickFormatter != null) {
+      return tickFormatter!(value);
+    }
+
     if (value is double) {
       if (value == value.toInt()) {
         return '${value.toInt()}${unit ?? ''}';

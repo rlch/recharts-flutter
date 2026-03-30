@@ -1,22 +1,8 @@
-enum AxisType {
-  xAxis,
-  yAxis,
-  angleAxis,
-  radiusAxis,
-}
+enum AxisType { xAxis, yAxis, angleAxis, radiusAxis }
 
-enum AxisOrientation {
-  top,
-  bottom,
-  left,
-  right,
-}
+enum AxisOrientation { top, bottom, left, right }
 
-enum AxisDomain {
-  auto,
-  dataMin,
-  dataMax,
-}
+enum AxisDomain { auto, dataMin, dataMax }
 
 enum ScaleType {
   auto,
@@ -33,10 +19,9 @@ enum ScaleType {
   category,
 }
 
-enum TicksType {
-  number,
-  category,
-}
+enum TicksType { number, category }
+
+typedef AxisTickFormatter = String Function(dynamic value);
 
 class AxisConfig {
   final String? dataKey;
@@ -119,7 +104,8 @@ class AxisConfig {
       ticks: ticks ?? this.ticks,
       hide: hide ?? this.hide,
       allowDecimals: allowDecimals ?? this.allowDecimals,
-      allowDuplicatedCategory: allowDuplicatedCategory ?? this.allowDuplicatedCategory,
+      allowDuplicatedCategory:
+          allowDuplicatedCategory ?? this.allowDuplicatedCategory,
       allowDataOverflow: allowDataOverflow ?? this.allowDataOverflow,
       minTickGap: minTickGap ?? this.minTickGap,
       angle: angle ?? this.angle,
@@ -148,14 +134,14 @@ class AxisPadding {
   });
 
   const AxisPadding.all(double value)
-      : left = value,
-        right = value,
-        top = value,
-        bottom = value;
+    : left = value,
+      right = value,
+      top = value,
+      bottom = value;
 
   const AxisPadding.symmetric({double horizontal = 0, double vertical = 0})
-      : left = horizontal,
-        right = horizontal,
-        top = vertical,
-        bottom = vertical;
+    : left = horizontal,
+      right = horizontal,
+      top = vertical,
+      bottom = vertical;
 }

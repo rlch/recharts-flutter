@@ -8,6 +8,8 @@ import '../models/chart_layout.dart';
 import '../models/interaction_state.dart';
 
 typedef InteractionStateCallback = void Function(ChartInteractionState state);
+typedef PercentValueResolver = double? Function(int index);
+typedef PointCoordinateResolver = Offset? Function(int index);
 
 class SeriesInfo {
   final String dataKey;
@@ -15,6 +17,9 @@ class SeriesInfo {
   final Color color;
   final String? unit;
   final LegendType legendType;
+  final PercentValueResolver? percentValueForIndex;
+  final PointCoordinateResolver? pointCoordinateForIndex;
+  final bool usePercentTooltipLabel;
 
   const SeriesInfo({
     required this.dataKey,
@@ -22,6 +27,9 @@ class SeriesInfo {
     required this.color,
     this.unit,
     this.legendType = LegendType.square,
+    this.percentValueForIndex,
+    this.pointCoordinateForIndex,
+    this.usePercentTooltipLabel = false,
   });
 
   String get displayName => name ?? dataKey;
@@ -232,12 +240,15 @@ class ChartInteractionController {
     for (final seriesInfo in seriesInfoList) {
       final value = point[seriesInfo.dataKey];
       if (value != null) {
+        final percentValue = seriesInfo.percentValueForIndex?.call(index);
         entries.add(
           TooltipEntry(
             name: seriesInfo.displayName,
             value: value,
             color: seriesInfo.color,
             unit: seriesInfo.unit,
+            percentValue: percentValue,
+            usePercentTooltipLabel: seriesInfo.usePercentTooltipLabel,
           ),
         );
       }
@@ -264,6 +275,14 @@ class ChartInteractionController {
 
   Offset? getPointCoordinate(int index, String dataKey) {
     if (index < 0 || index >= data.length) return null;
+
+    final seriesInfo = seriesInfoList
+        .where((s) => s.dataKey == dataKey)
+        .firstOrNull;
+    final customCoordinate = seriesInfo?.pointCoordinateForIndex?.call(index);
+    if (customCoordinate != null) {
+      return customCoordinate;
+    }
 
     final point = data[index];
     final numericValue = point.getNumericValue(dataKey);

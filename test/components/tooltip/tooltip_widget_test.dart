@@ -23,9 +23,7 @@ void main() {
         trigger: TooltipTrigger.click,
       );
 
-      final updated = tooltip.copyWith(
-        backgroundColor: Colors.black,
-      );
+      final updated = tooltip.copyWith(backgroundColor: Colors.black);
 
       expect(updated.enabled, false);
       expect(updated.trigger, TooltipTrigger.click);
@@ -81,7 +79,9 @@ void main() {
       expect(find.byType(SizedBox), findsWidgets);
     });
 
-    testWidgets('renders tooltip content when payload is valid', (tester) async {
+    testWidgets('renders tooltip content when payload is valid', (
+      tester,
+    ) async {
       const payload = TooltipPayload(
         index: 0,
         label: 'January',
@@ -206,7 +206,12 @@ void main() {
         index: 0,
         label: 'Test',
         entries: [
-          TooltipEntry(name: 'Value1', value: 100, color: Color(0xFF8884d8)),
+          TooltipEntry(
+            name: 'Value1',
+            value: 100,
+            color: Color(0xFF8884d8),
+            percentValue: 0.25,
+          ),
           TooltipEntry(name: 'Value2', value: 200, color: Color(0xFF82ca9d)),
         ],
         coordinate: Offset.zero,
@@ -225,7 +230,7 @@ void main() {
 
       expect(find.text('Value1'), findsOneWidget);
       expect(find.text('Value2'), findsOneWidget);
-      expect(find.text('100'), findsOneWidget);
+      expect(find.text('100 (25%)'), findsOneWidget);
       expect(find.text('200'), findsOneWidget);
     });
 

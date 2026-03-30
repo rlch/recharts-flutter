@@ -207,6 +207,32 @@ void main() {
         expect(payload.entries[1].value, 50);
       });
 
+      test('includes percent value when provided by series info', () {
+        final controller = ChartInteractionController(
+          data: testData,
+          layout: layout,
+          xScale: xScale,
+          yScale: yScale,
+          xDataKey: 'name',
+          seriesInfoList: const [
+            SeriesInfo(
+              dataKey: 'value',
+              name: 'Value 1',
+              color: Color(0xFF8884d8),
+              percentValueForIndex: _percentAtQuarter,
+            ),
+          ],
+          onStateChanged: (_) {},
+        );
+
+        final payload = controller.buildTooltipPayload(
+          0,
+          const Offset(100, 150),
+        );
+
+        expect(payload.entries.single.percentValue, 0.25);
+      });
+
       test('skips null values', () {
         final dataWithNull = ChartDataSet([
           {'name': 'A', 'value': 100, 'value2': null},
@@ -427,3 +453,5 @@ void main() {
     });
   });
 }
+
+double _percentAtQuarter(int _) => 0.25;

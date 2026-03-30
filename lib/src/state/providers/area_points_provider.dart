@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/scale/scale.dart';
 import '../../core/types/chart_data.dart';
+import '../../core/types/series_types.dart';
 import '../../cartesian/series/area_series.dart';
 import '../models/computed_data.dart';
 
@@ -155,4 +156,114 @@ List<AreaPoint> computeAreaPoints({
   }
 
   return points;
+}
+
+Map<String, List<AreaPoint>> computeStackedAreaPointsMap({
+  required ChartDataSet data,
+  required List<AreaSeries> areaSeries,
+  required Scale<dynamic, double> xScale,
+  required Scale<dynamic, double> yScale,
+  String? xDataKey,
+  String? yDataKey,
+  double? baseX,
+  double? baseY,
+  bool verticalLayout = false,
+  StackOffsetType stackOffset = StackOffsetType.none,
+}) {
+  if (areaSeries.isEmpty) {
+    return <String, List<AreaPoint>>{};
+  }
+
+  final pointsMap = <String, List<AreaPoint>>{};
+
+  if (verticalLayout) {
+    for (final series in areaSeries) {
+      pointsMap[series.dataKey] = computeAreaPoints(
+        data: data,
+        series: series,
+        xScale: xScale,
+        yScale: yScale,
+        xDataKey: xDataKey,
+        yDataKey: yDataKey,
+        baseX: baseX,
+        baseY: baseY,
+        verticalLayout: verticalLayout,
+      );
+    }
+    return pointsMap;
+  }
+
+  final stackGroups = <String, List<AreaSeries>>{};
+  for (final series in areaSeries) {
+    final stackKey = series.stackId ?? '__unstacked__${series.dataKey}';
+    stackGroups.putIfAbsent(stackKey, () => <AreaSeries>[]).add(series);
+  }
+
+  final expandedStack = stackOffset == StackOffsetType.expand;
+
+  for (final entry in stackGroups.entries) {
+    final stackSeries = entry.value;
+    final cumulative = List<double>.filled(data.length, 0);
+    final totals = List<double>.filled(data.length, 0);
+
+    if (expandedStack) {
+      for (int i = 0; i < data.length; i++) {
+        double sum = 0;
+        for (final series in stackSeries) {
+          final value = data[i].getNumericValue(series.dataKey);
+          if (value != null && !value.isNaN) {
+            sum += value;
+          }
+        }
+        totals[i] = sum;
+      }
+    }
+
+    for (final series in stackSeries) {
+      final points = <AreaPoint>[];
+      for (int i = 0; i < data.length; i++) {
+        final rawValue = data[i][series.dataKey];
+        final value = data[i].getNumericValue(series.dataKey);
+        final xValue = xDataKey != null ? data[i][xDataKey] : i;
+        final x = xScale(xValue) + (xScale.bandwidth ?? 0) / 2;
+
+        if (value == null || value.isNaN) {
+          points.add(
+            AreaPoint(
+              index: i,
+              x: x,
+              y: double.nan,
+              baseY: baseY ?? yScale(0),
+              value: rawValue,
+              isNull: true,
+            ),
+          );
+          continue;
+        }
+
+        final total = totals[i];
+        final normalizedValue = expandedStack
+            ? (total > 0 ? value / total : 0)
+            : value;
+        final stackBaseValue = cumulative[i];
+        final stackTopValue = stackBaseValue + normalizedValue;
+        cumulative[i] = stackTopValue;
+
+        points.add(
+          AreaPoint(
+            index: i,
+            x: x,
+            y: yScale(stackTopValue),
+            baseY: yScale(stackBaseValue),
+            value: value,
+            isNull: false,
+          ),
+        );
+      }
+
+      pointsMap[series.dataKey] = points;
+    }
+  }
+
+  return pointsMap;
 }
