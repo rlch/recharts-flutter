@@ -51,7 +51,7 @@ class ChartMargin {
     this.top = 5,
     this.right = 5,
     this.bottom = 30,
-    this.left = 60,
+    this.left = 40,
   });
 
   const ChartMargin.all(double value)

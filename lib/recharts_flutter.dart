@@ -24,6 +24,7 @@ export 'src/components/tooltip/tooltip.dart';
 export 'src/components/legend/legend.dart';
 export 'src/components/brush/brush.dart';
 export 'src/components/responsive_chart_container.dart';
+export 'src/converter/recharts_converter.dart';
 
 // Cartesian
 export 'src/cartesian/cartesian_chart_widget.dart';

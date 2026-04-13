@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'converter_lab.dart';
 
 // Line Chart Examples
 import 'examples/line_chart/simple_line_chart.dart';
@@ -81,7 +82,8 @@ class _RechartsExampleAppState extends State<RechartsExampleApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
@@ -399,13 +401,16 @@ class ChartGallery extends StatefulWidget {
 class _ChartGalleryState extends State<ChartGallery> {
   int _selectedCategoryIndex = 0;
   int _selectedExampleIndex = 0;
+  int _selectedTabIndex = 0;
   bool _showCode = false;
 
   ExampleCategory get _currentCategory => categories[_selectedCategoryIndex];
-  ExampleItem get _currentExample => _currentCategory.examples[_selectedExampleIndex];
+  ExampleItem get _currentExample =>
+      _currentCategory.examples[_selectedExampleIndex];
 
   void _selectExample(int categoryIndex, int exampleIndex) {
     setState(() {
+      _selectedTabIndex = 0;
       _selectedCategoryIndex = categoryIndex;
       _selectedExampleIndex = exampleIndex;
       _showCode = false;
@@ -415,30 +420,58 @@ class _ChartGalleryState extends State<ChartGallery> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_currentExample.title),
-        actions: [
-          IconButton(
-            icon: Icon(_showCode ? Icons.visibility : Icons.code),
-            tooltip: _showCode ? 'Show Chart' : 'Show Code',
-            onPressed: () {
+    return DefaultTabController(
+      initialIndex: _selectedTabIndex,
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            _selectedTabIndex == 0 ? _currentExample.title : 'Converter Lab',
+          ),
+          bottom: TabBar(
+            onTap: (index) {
               setState(() {
-                _showCode = !_showCode;
+                _selectedTabIndex = index;
               });
             },
+            tabs: const [
+              Tab(text: 'Gallery', icon: Icon(Icons.grid_view)),
+              Tab(text: 'Converter', icon: Icon(Icons.auto_fix_high)),
+            ],
           ),
-          IconButton(
-            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-            tooltip: 'Toggle Theme',
-            onPressed: widget.onThemeToggle,
-          ),
-        ],
-      ),
-      drawer: _buildDrawer(),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: _showCode ? _buildCodeView() : _buildChartView(),
+          actions: [
+            if (_selectedTabIndex == 0)
+              IconButton(
+                icon: Icon(_showCode ? Icons.visibility : Icons.code),
+                tooltip: _showCode ? 'Show Chart' : 'Show Code',
+                onPressed: () {
+                  setState(() {
+                    _showCode = !_showCode;
+                  });
+                },
+              ),
+            IconButton(
+              icon:
+                  Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+              tooltip: 'Toggle Theme',
+              onPressed: widget.onThemeToggle,
+            ),
+          ],
+        ),
+        drawer: _buildDrawer(),
+        body: IndexedStack(
+          index: _selectedTabIndex,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: _showCode ? _buildCodeView() : _buildChartView(),
+            ),
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: ConverterLab(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -473,7 +506,10 @@ class _ChartGalleryState extends State<ChartGallery> {
                 Text(
                   'Examples Gallery',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer
+                        .withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -497,7 +533,10 @@ class _ChartGalleryState extends State<ChartGallery> {
                 return ListTile(
                   title: Text(example.title),
                   selected: isSelected,
-                  selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  selectedTileColor: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withValues(alpha: 0.3),
                   contentPadding: const EdgeInsets.only(left: 56),
                   onTap: () => _selectExample(categoryIndex, exampleIndex),
                 );
@@ -529,7 +568,8 @@ class _ChartGalleryState extends State<ChartGallery> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
@@ -544,7 +584,8 @@ class _ChartGalleryState extends State<ChartGallery> {
                   icon: const Icon(Icons.copy, size: 20),
                   tooltip: 'Copy to clipboard',
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _currentExample.sourceCode));
+                    Clipboard.setData(
+                        ClipboardData(text: _currentExample.sourceCode));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Code copied to clipboard')),
                     );
