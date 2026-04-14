@@ -81,7 +81,8 @@ class _RechartsExampleAppState extends State<RechartsExampleApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
@@ -402,7 +403,8 @@ class _ChartGalleryState extends State<ChartGallery> {
   bool _showCode = false;
 
   ExampleCategory get _currentCategory => categories[_selectedCategoryIndex];
-  ExampleItem get _currentExample => _currentCategory.examples[_selectedExampleIndex];
+  ExampleItem get _currentExample =>
+      _currentCategory.examples[_selectedExampleIndex];
 
   void _selectExample(int categoryIndex, int exampleIndex) {
     setState(() {
@@ -429,7 +431,8 @@ class _ChartGalleryState extends State<ChartGallery> {
             },
           ),
           IconButton(
-            icon: Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            icon:
+                Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             tooltip: 'Toggle Theme',
             onPressed: widget.onThemeToggle,
           ),
@@ -473,7 +476,10 @@ class _ChartGalleryState extends State<ChartGallery> {
                 Text(
                   'Examples Gallery',
                   style: TextStyle(
-                    color: Theme.of(context).colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onPrimaryContainer
+                        .withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -497,7 +503,10 @@ class _ChartGalleryState extends State<ChartGallery> {
                 return ListTile(
                   title: Text(example.title),
                   selected: isSelected,
-                  selectedTileColor: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.3),
+                  selectedTileColor: Theme.of(context)
+                      .colorScheme
+                      .primaryContainer
+                      .withValues(alpha: 0.3),
                   contentPadding: const EdgeInsets.only(left: 56),
                   onTap: () => _selectExample(categoryIndex, exampleIndex),
                 );
@@ -529,7 +538,8 @@ class _ChartGalleryState extends State<ChartGallery> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(12)),
             ),
             child: Row(
               children: [
@@ -544,7 +554,8 @@ class _ChartGalleryState extends State<ChartGallery> {
                   icon: const Icon(Icons.copy, size: 20),
                   tooltip: 'Copy to clipboard',
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _currentExample.sourceCode));
+                    Clipboard.setData(
+                        ClipboardData(text: _currentExample.sourceCode));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Code copied to clipboard')),
                     );

@@ -22,6 +22,7 @@ class AreaPoint {
   final int index;
   final double x;
   final double y;
+  final double? baseX;
   final double baseY;
   final dynamic value;
   final bool isNull;
@@ -30,13 +31,14 @@ class AreaPoint {
     required this.index,
     required this.x,
     required this.y,
+    this.baseX,
     required this.baseY,
     this.value,
     this.isNull = false,
   });
 
   Offset get topOffset => Offset(x, y);
-  Offset get bottomOffset => Offset(x, baseY);
+  Offset get bottomOffset => Offset(baseX ?? x, baseY);
 }
 
 class BarRect {

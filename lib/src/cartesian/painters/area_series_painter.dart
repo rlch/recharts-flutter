@@ -9,10 +9,7 @@ class AreaSeriesPainter {
   final AreaSeries series;
   final List<AreaPoint> points;
 
-  AreaSeriesPainter({
-    required this.series,
-    required this.points,
-  });
+  AreaSeriesPainter({required this.series, required this.points});
 
   void paint(Canvas canvas, Size size) {
     if (series.hide || points.isEmpty) return;
@@ -37,14 +34,14 @@ class AreaSeriesPainter {
 
       final path = Path();
 
-      path.moveTo(segment.first.x, segment.first.baseY);
+      path.moveTo(segment.first.bottomOffset.dx, segment.first.bottomOffset.dy);
 
       for (final point in segment) {
         path.lineTo(point.x, point.y);
       }
 
       for (int i = segment.length - 1; i >= 0; i--) {
-        path.lineTo(segment[i].x, segment[i].baseY);
+        path.lineTo(segment[i].bottomOffset.dx, segment[i].bottomOffset.dy);
       }
 
       path.close();

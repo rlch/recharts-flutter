@@ -24,6 +24,7 @@ class XAxis {
   final AxisPadding? padding;
   final double? tickMargin;
   final int? interval;
+  final AxisTickFormatter? tickFormatter;
 
   const XAxis({
     this.id = '0',
@@ -47,6 +48,7 @@ class XAxis {
     this.padding,
     this.tickMargin,
     this.interval,
+    this.tickFormatter,
   });
 
   XAxis copyWith({
@@ -71,6 +73,7 @@ class XAxis {
     AxisPadding? padding,
     double? tickMargin,
     int? interval,
+    AxisTickFormatter? tickFormatter,
   }) {
     return XAxis(
       id: id ?? this.id,
@@ -82,7 +85,8 @@ class XAxis {
       ticks: ticks ?? this.ticks,
       hide: hide ?? this.hide,
       allowDecimals: allowDecimals ?? this.allowDecimals,
-      allowDuplicatedCategory: allowDuplicatedCategory ?? this.allowDuplicatedCategory,
+      allowDuplicatedCategory:
+          allowDuplicatedCategory ?? this.allowDuplicatedCategory,
       allowDataOverflow: allowDataOverflow ?? this.allowDataOverflow,
       minTickGap: minTickGap ?? this.minTickGap,
       angle: angle ?? this.angle,
@@ -94,6 +98,7 @@ class XAxis {
       padding: padding ?? this.padding,
       tickMargin: tickMargin ?? this.tickMargin,
       interval: interval ?? this.interval,
+      tickFormatter: tickFormatter ?? this.tickFormatter,
     );
   }
 }

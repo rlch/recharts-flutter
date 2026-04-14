@@ -6,6 +6,8 @@ import '../grid/cartesian_grid.dart';
 import '../series/line_series.dart';
 import '../series/area_series.dart';
 import '../series/bar_series.dart';
+import '../reference/reference_line.dart';
+import '../reference/reference_line_painter.dart';
 import 'axis_painter.dart';
 import 'grid_painter.dart';
 import 'animated_line_series_painter.dart';
@@ -13,6 +15,7 @@ import 'animated_area_series_painter.dart';
 import 'animated_bar_series_painter.dart';
 import 'cursor_painter.dart';
 import '../../core/scale/scale.dart';
+import '../../core/types/series_types.dart';
 import '../../state/models/chart_layout.dart';
 import '../../state/models/computed_data.dart';
 import '../../components/tooltip/tooltip_types.dart';
@@ -25,6 +28,8 @@ class AnimatedCartesianChartPainter extends CustomPainter {
   final List<LineSeries> lineSeries;
   final List<AreaSeries> areaSeries;
   final List<BarSeries> barSeries;
+  final StackOffsetType stackOffset;
+  final List<ReferenceLine> referenceLines;
   final Scale<dynamic, double> xScale;
   final Scale<dynamic, double> yScale;
   final Map<String, List<LinePoint>> linePointsMap;
@@ -46,6 +51,8 @@ class AnimatedCartesianChartPainter extends CustomPainter {
     required this.lineSeries,
     required this.areaSeries,
     required this.barSeries,
+    this.stackOffset = StackOffsetType.none,
+    this.referenceLines = const [],
     required this.xScale,
     required this.yScale,
     required this.linePointsMap,
@@ -66,6 +73,8 @@ class AnimatedCartesianChartPainter extends CustomPainter {
 
     _paintGrid(canvas, size);
 
+    _paintReferenceLines(canvas, size, isFront: false);
+
     _paintAreas(canvas, size);
 
     _paintBars(canvas, size);
@@ -74,7 +83,23 @@ class AnimatedCartesianChartPainter extends CustomPainter {
 
     _paintAxes(canvas, size);
 
+    _paintReferenceLines(canvas, size, isFront: true);
+
     _paintCursor(canvas, size);
+  }
+
+  void _paintReferenceLines(Canvas canvas, Size size, {required bool isFront}) {
+    for (final line in referenceLines) {
+      if (line.isFront != isFront) continue;
+
+      final painter = ReferenceLinePainter(
+        line: line,
+        layout: layout,
+        xScale: xScale,
+        yScale: yScale,
+      );
+      painter.paint(canvas, size);
+    }
   }
 
   void _paintCursor(Canvas canvas, Size size) {
@@ -106,8 +131,9 @@ class AnimatedCartesianChartPainter extends CustomPainter {
       horizontalLines.addAll(grid!.horizontalPoints!);
     } else {
       final yTicks = yScale.ticks(5);
+      final yBandwidth = yScale.bandwidth ?? 0;
       for (final tick in yTicks) {
-        horizontalLines.add(yScale(tick));
+        horizontalLines.add(yScale(tick) + yBandwidth / 2);
       }
     }
 
@@ -207,7 +233,7 @@ class AnimatedCartesianChartPainter extends CustomPainter {
           : layout.plotLeft;
 
       final painter = AxisPainter.fromYAxis(
-        axis: axis,
+        axis: _buildEffectiveYAxis(axis),
         scale: yScale,
         axisX: axisX,
         plotTop: layout.plotTop,
@@ -217,9 +243,36 @@ class AnimatedCartesianChartPainter extends CustomPainter {
     }
   }
 
+  YAxis _buildEffectiveYAxis(YAxis axis) {
+    if (stackOffset != StackOffsetType.expand) {
+      return axis;
+    }
+
+    return axis.copyWith(
+      domain: const [0, 1],
+      tickCount: axis.tickCount ?? 4,
+      ticks: axis.ticks ?? const [0.0, 0.25, 0.5, 0.75, 1.0],
+      tickFormatter:
+          axis.tickFormatter ??
+          (value) {
+            if (value is num) {
+              final percent = value.toDouble() * 100;
+              if ((percent - percent.roundToDouble()).abs() < 1e-6) {
+                return '${percent.round()}%';
+              }
+
+              return '${percent.toStringAsFixed(1)}%';
+            }
+
+            return value.toString();
+          },
+    );
+  }
+
   @override
   bool shouldRepaint(covariant AnimatedCartesianChartPainter oldDelegate) {
     return animationProgress != oldDelegate.animationProgress ||
+        referenceLines != oldDelegate.referenceLines ||
         linePointsMap != oldDelegate.linePointsMap ||
         areaPointsMap != oldDelegate.areaPointsMap ||
         barRectsMap != oldDelegate.barRectsMap ||

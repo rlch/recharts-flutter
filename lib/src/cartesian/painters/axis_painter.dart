@@ -1,6 +1,7 @@
 import 'package:flutter/rendering.dart';
 
 import '../../core/scale/scale.dart';
+import '../../core/types/axis_types.dart';
 import '../axis/x_axis.dart';
 import '../axis/y_axis.dart';
 
@@ -18,6 +19,8 @@ class AxisPainter {
   final double tickSize;
   final double tickMargin;
   final String? unit;
+  final AxisTickFormatter? tickFormatter;
+  final List<dynamic>? ticks;
   final bool hide;
 
   AxisPainter({
@@ -34,6 +37,8 @@ class AxisPainter {
     this.tickSize = 6,
     this.tickMargin = 3,
     this.unit,
+    this.tickFormatter,
+    this.ticks,
     this.hide = false,
   });
 
@@ -52,8 +57,10 @@ class AxisPainter {
       plotStart: plotLeft,
       plotEnd: plotRight,
       tickCount: axis.tickCount ?? 5,
+      ticks: axis.ticks,
       tickMargin: axis.tickMargin ?? 3,
       unit: axis.unit,
+      tickFormatter: axis.tickFormatter,
       hide: axis.hide,
     );
   }
@@ -73,8 +80,10 @@ class AxisPainter {
       plotStart: plotTop,
       plotEnd: plotBottom,
       tickCount: axis.tickCount ?? 5,
+      ticks: axis.ticks,
       tickMargin: axis.tickMargin ?? 3,
       unit: axis.unit,
+      tickFormatter: axis.tickFormatter,
       hide: axis.hide,
     );
   }
@@ -101,7 +110,7 @@ class AxisPainter {
       axisPaint,
     );
 
-    final ticks = scale.ticks(tickCount);
+    final ticks = this.ticks ?? scale.ticks(tickCount);
     final bandwidth = scale.bandwidth ?? 0;
     final xOffset = bandwidth / 2;
 
@@ -112,11 +121,7 @@ class AxisPainter {
       final tickStart = isTop ? axisPosition - tickSize : axisPosition;
       final tickEnd = isTop ? axisPosition : axisPosition + tickSize;
 
-      canvas.drawLine(
-        Offset(x, tickStart),
-        Offset(x, tickEnd),
-        axisPaint,
-      );
+      canvas.drawLine(Offset(x, tickStart), Offset(x, tickEnd), axisPaint);
 
       final label = _formatLabel(tick);
       final textPainter = TextPainter(
@@ -132,10 +137,7 @@ class AxisPainter {
           ? axisPosition - tickSize - tickMargin - textPainter.height
           : axisPosition + tickSize + tickMargin;
 
-      textPainter.paint(
-        canvas,
-        Offset(x - textPainter.width / 2, labelY),
-      );
+      textPainter.paint(canvas, Offset(x - textPainter.width / 2, labelY));
     }
   }
 
@@ -146,20 +148,18 @@ class AxisPainter {
       axisPaint,
     );
 
-    final ticks = scale.ticks(tickCount);
+    final ticks = this.ticks ?? scale.ticks(tickCount);
+    final bandwidth = scale.bandwidth ?? 0;
+    final yOffset = bandwidth / 2;
 
     for (final tick in ticks) {
-      final y = scale(tick);
+      final y = scale(tick) + yOffset;
       if (y < plotStart || y > plotEnd) continue;
 
       final tickStart = isLeft ? axisPosition - tickSize : axisPosition;
       final tickEnd = isLeft ? axisPosition : axisPosition + tickSize;
 
-      canvas.drawLine(
-        Offset(tickStart, y),
-        Offset(tickEnd, y),
-        axisPaint,
-      );
+      canvas.drawLine(Offset(tickStart, y), Offset(tickEnd, y), axisPaint);
 
       final label = _formatLabel(tick);
       final textPainter = TextPainter(
@@ -175,14 +175,15 @@ class AxisPainter {
           ? axisPosition - tickSize - tickMargin - textPainter.width
           : axisPosition + tickSize + tickMargin;
 
-      textPainter.paint(
-        canvas,
-        Offset(labelX, y - textPainter.height / 2),
-      );
+      textPainter.paint(canvas, Offset(labelX, y - textPainter.height / 2));
     }
   }
 
   String _formatLabel(dynamic value) {
+    if (tickFormatter != null) {
+      return tickFormatter!(value);
+    }
+
     if (value is double) {
       if (value == value.toInt()) {
         return '${value.toInt()}${unit ?? ''}';

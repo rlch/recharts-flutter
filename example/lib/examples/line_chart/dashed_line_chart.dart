@@ -23,6 +23,7 @@ class DashedLineChart extends StatelessWidget {
           stroke: Color(0xFF8884D8),
           strokeWidth: 2,
           curveType: CurveType.monotone,
+          strokeDasharray: [5, 5],
         ),
         LineSeries(
           dataKey: 'uv',
@@ -30,6 +31,7 @@ class DashedLineChart extends StatelessWidget {
           stroke: Color(0xFF82CA9D),
           strokeWidth: 2,
           curveType: CurveType.monotone,
+          strokeDasharray: [3, 4, 5, 2],
         ),
       ],
       tooltip: const ChartTooltip(),

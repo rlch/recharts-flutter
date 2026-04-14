@@ -16,15 +16,15 @@ class DefaultTooltipContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final labelStyle = config.labelStyle ??
+    final labelStyle =
+        config.labelStyle ??
         theme.textTheme.bodySmall?.copyWith(
           fontWeight: FontWeight.w600,
           color: Colors.grey[800],
         );
-    final valueStyle = config.valueStyle ??
-        theme.textTheme.bodySmall?.copyWith(
-          color: Colors.grey[700],
-        );
+    final valueStyle =
+        config.valueStyle ??
+        theme.textTheme.bodySmall?.copyWith(color: Colors.grey[700]);
 
     return Container(
       padding: config.contentPadding,
@@ -80,12 +80,19 @@ class DefaultTooltipContent extends StatelessWidget {
             ),
             Text(config.separator ?? ' : ', style: valueStyle),
           ],
-          Text(
-            entry.formattedValue + (entry.unit ?? ''),
-            style: valueStyle,
-          ),
+          Text(_formatEntryValue(entry), style: valueStyle),
         ],
       ),
     );
+  }
+
+  String _formatEntryValue(TooltipEntry entry) {
+    final rawValue = entry.formattedValue + (entry.unit ?? '');
+    final percentValue = entry.formattedPercentValue;
+    if (percentValue == null || entry.usePercentTooltipLabel) {
+      return rawValue;
+    }
+
+    return '$rawValue ($percentValue)';
   }
 }

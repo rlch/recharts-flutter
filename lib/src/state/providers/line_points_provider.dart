@@ -11,6 +11,8 @@ class LinePointsParams {
   final Scale<dynamic, double> xScale;
   final Scale<dynamic, double> yScale;
   final String? xDataKey;
+  final String? yDataKey;
+  final bool verticalLayout;
 
   const LinePointsParams({
     required this.data,
@@ -18,6 +20,8 @@ class LinePointsParams {
     required this.xScale,
     required this.yScale,
     this.xDataKey,
+    this.yDataKey,
+    this.verticalLayout = false,
   });
 
   @override
@@ -26,20 +30,27 @@ class LinePointsParams {
       other is LinePointsParams &&
           data == other.data &&
           series.dataKey == other.series.dataKey &&
-          xDataKey == other.xDataKey;
+          xDataKey == other.xDataKey &&
+          yDataKey == other.yDataKey &&
+          verticalLayout == other.verticalLayout;
 
   @override
-  int get hashCode => Object.hash(data, series.dataKey, xDataKey);
+  int get hashCode =>
+      Object.hash(data, series.dataKey, xDataKey, yDataKey, verticalLayout);
 }
 
-final linePointsProvider =
-    Provider.family<List<LinePoint>, LinePointsParams>((ref, params) {
+final linePointsProvider = Provider.family<List<LinePoint>, LinePointsParams>((
+  ref,
+  params,
+) {
   return computeLinePoints(
     data: params.data,
     series: params.series,
     xScale: params.xScale,
     yScale: params.yScale,
     xDataKey: params.xDataKey,
+    yDataKey: params.yDataKey,
+    verticalLayout: params.verticalLayout,
   );
 });
 
@@ -49,35 +60,66 @@ List<LinePoint> computeLinePoints({
   required Scale<dynamic, double> xScale,
   required Scale<dynamic, double> yScale,
   String? xDataKey,
+  String? yDataKey,
+  bool verticalLayout = false,
 }) {
   final points = <LinePoint>[];
   final bandwidth = xScale.bandwidth ?? 0;
   final xOffset = bandwidth / 2;
+  final yBandwidth = yScale.bandwidth ?? 0;
+  final yOffset = yBandwidth / 2;
 
   for (int i = 0; i < data.length; i++) {
     final point = data[i];
     final rawValue = point[series.dataKey];
     final numValue = point.getNumericValue(series.dataKey);
 
+    if (verticalLayout) {
+      final yValue = yDataKey != null ? point[yDataKey] : i;
+      final y = yScale(yValue) + yOffset;
+
+      if (numValue == null) {
+        points.add(
+          LinePoint(
+            index: i,
+            x: double.nan,
+            y: y,
+            value: rawValue,
+            isNull: true,
+          ),
+        );
+      } else {
+        points.add(
+          LinePoint(
+            index: i,
+            x: xScale(numValue),
+            y: y,
+            value: numValue,
+            isNull: false,
+          ),
+        );
+      }
+
+      continue;
+    }
+
     final xValue = xDataKey != null ? point[xDataKey] : i;
     final x = xScale(xValue) + xOffset;
 
     if (numValue == null) {
-      points.add(LinePoint(
-        index: i,
-        x: x,
-        y: double.nan,
-        value: rawValue,
-        isNull: true,
-      ));
+      points.add(
+        LinePoint(index: i, x: x, y: double.nan, value: rawValue, isNull: true),
+      );
     } else {
-      points.add(LinePoint(
-        index: i,
-        x: x,
-        y: yScale(numValue),
-        value: numValue,
-        isNull: false,
-      ));
+      points.add(
+        LinePoint(
+          index: i,
+          x: x,
+          y: yScale(numValue),
+          value: numValue,
+          isNull: false,
+        ),
+      );
     }
   }
 

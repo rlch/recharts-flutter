@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../core/types/chart_data.dart';
+import '../core/types/axis_types.dart';
+import '../core/types/series_types.dart';
 import '../core/animation/easing_curves.dart';
 import 'axis/x_axis.dart';
 import 'axis/y_axis.dart';
 import 'grid/cartesian_grid.dart';
+import 'reference/reference_line.dart';
 import 'series/line_series.dart';
 import 'series/area_series.dart';
 import 'series/bar_series.dart';
@@ -69,6 +72,14 @@ class CartesianChartWidget extends StatefulWidget {
   /// Bar series to render.
   final List<BarSeries> barSeries;
 
+  /// Offset strategy for stacked area series.
+  ///
+  /// Use [StackOffsetType.expand] to render percentage area charts.
+  final StackOffsetType stackOffset;
+
+  /// Reference lines to render.
+  final List<ReferenceLine> referenceLines;
+
   /// Background color of the chart.
   final Color? backgroundColor;
 
@@ -112,6 +123,8 @@ class CartesianChartWidget extends StatefulWidget {
     this.lineSeries = const [],
     this.areaSeries = const [],
     this.barSeries = const [],
+    this.stackOffset = StackOffsetType.none,
+    this.referenceLines = const [],
     this.backgroundColor,
     this.tooltip,
     this.syncId,
@@ -151,7 +164,10 @@ class _CartesianChartWidgetState extends State<CartesianChartWidget> {
         final width = widget.width ?? constraints.maxWidth;
         final height = widget.height ?? constraints.maxHeight;
 
-        if (width <= 0 || height <= 0 || width.isInfinite || height.isInfinite) {
+        if (width <= 0 ||
+            height <= 0 ||
+            width.isInfinite ||
+            height.isInfinite) {
           return const SizedBox.shrink();
         }
 
@@ -166,6 +182,8 @@ class _CartesianChartWidgetState extends State<CartesianChartWidget> {
           lineSeries: widget.lineSeries,
           areaSeries: widget.areaSeries,
           barSeries: widget.barSeries,
+          stackOffset: widget.stackOffset,
+          referenceLines: widget.referenceLines,
           backgroundColor: widget.backgroundColor,
           tooltip: widget.tooltip,
           syncId: widget.syncId,
@@ -202,6 +220,8 @@ class _ChartContent extends StatefulWidget {
   final List<LineSeries> lineSeries;
   final List<AreaSeries> areaSeries;
   final List<BarSeries> barSeries;
+  final StackOffsetType stackOffset;
+  final List<ReferenceLine> referenceLines;
   final Color? backgroundColor;
   final ChartTooltip? tooltip;
   final String? syncId;
@@ -223,6 +243,8 @@ class _ChartContent extends StatefulWidget {
     required this.lineSeries,
     required this.areaSeries,
     required this.barSeries,
+    required this.stackOffset,
+    required this.referenceLines,
     this.backgroundColor,
     this.tooltip,
     this.syncId,
@@ -295,16 +317,27 @@ class _ChartContentState extends State<_ChartContent>
   void _handleSyncedHover(int index) {
     if (_controller == null) return;
 
-    final payload = _controller!.buildTooltipPayload(
-      index,
-      _interactionState.activeCoordinate ?? Offset.zero,
-    );
+    final anchor = _controller!.getTooltipAnchorCoordinate(index);
+    if (anchor == null) {
+      setState(() {
+        _interactionState = ChartInteractionState.inactive;
+      });
+      return;
+    }
+
+    final payload = _controller!.buildTooltipPayload(index, anchor);
+    if (payload.isEmpty) {
+      setState(() {
+        _interactionState = ChartInteractionState.inactive;
+      });
+      return;
+    }
 
     setState(() {
       _interactionState = ChartInteractionState(
         isActive: true,
         activeIndex: index,
-        activeCoordinate: _interactionState.activeCoordinate,
+        activeCoordinate: anchor,
         tooltipPayload: payload,
       );
     });
@@ -365,12 +398,14 @@ class _ChartContentState extends State<_ChartContent>
     });
 
     if (widget.syncId != null && state.isActive && state.activeIndex != null) {
-      ChartSyncBus.instance.notifyHover(SyncHoverPayload(
-        syncId: widget.syncId!,
-        index: state.activeIndex,
-        coordinate: state.activeCoordinate,
-        sourceChartId: _chartId,
-      ));
+      ChartSyncBus.instance.notifyHover(
+        SyncHoverPayload(
+          syncId: widget.syncId!,
+          index: state.activeIndex,
+          coordinate: state.activeCoordinate,
+          sourceChartId: _chartId,
+        ),
+      );
     } else if (widget.syncId != null && !state.isActive) {
       ChartSyncBus.instance.clearHover(widget.syncId!, sourceChartId: _chartId);
     }
@@ -394,10 +429,15 @@ class _ChartContentState extends State<_ChartContent>
       margin: widget.margin,
     );
 
-    final effectiveXAxes =
-        widget.xAxes.isNotEmpty ? widget.xAxes : [const XAxis()];
-    final effectiveYAxes =
-        widget.yAxes.isNotEmpty ? widget.yAxes : [const YAxis()];
+    final effectiveXAxes = widget.xAxes.isNotEmpty
+        ? widget.xAxes
+        : [const XAxis()];
+    final effectiveYAxes = widget.yAxes.isNotEmpty
+        ? widget.yAxes
+        : [const YAxis()];
+    final primaryXAxis = effectiveXAxes.first;
+    final primaryYAxis = effectiveYAxes.first;
+    final isVerticalLayout = _isVerticalLayout(primaryXAxis, primaryYAxis);
 
     final yDataKeys = <String>[
       ...widget.lineSeries.map((s) => s.dataKey),
@@ -411,9 +451,14 @@ class _ChartContentState extends State<_ChartContent>
       xAxes: effectiveXAxes,
       yAxes: effectiveYAxes,
       yDataKeys: yDataKeys,
+      areaSeries: widget.areaSeries,
+      stackOffset: widget.stackOffset,
     );
 
-    final xDataKey = effectiveXAxes.first.dataKey;
+    final xDataKey = primaryXAxis.dataKey;
+    final categoryDataKey = isVerticalLayout
+        ? (primaryYAxis.dataKey ?? xDataKey ?? 'name')
+        : (xDataKey ?? primaryYAxis.dataKey ?? 'name');
 
     final linePointsMap = <String, List<LinePoint>>{};
     for (final series in widget.lineSeries) {
@@ -423,22 +468,26 @@ class _ChartContentState extends State<_ChartContent>
         xScale: scales.xScale,
         yScale: scales.yScale,
         xDataKey: xDataKey,
+        yDataKey: categoryDataKey,
+        verticalLayout: isVerticalLayout,
       );
     }
 
+    final baseX = scales.xScale(0);
     final baseY = scales.yScale(0);
 
-    final areaPointsMap = <String, List<AreaPoint>>{};
-    for (final series in widget.areaSeries) {
-      areaPointsMap[series.dataKey] = computeAreaPoints(
-        data: widget.dataSet,
-        series: series,
-        xScale: scales.xScale,
-        yScale: scales.yScale,
-        xDataKey: xDataKey,
-        baseY: baseY,
-      );
-    }
+    final areaPointsMap = computeStackedAreaPointsMap(
+      data: widget.dataSet,
+      areaSeries: widget.areaSeries,
+      xScale: scales.xScale,
+      yScale: scales.yScale,
+      xDataKey: xDataKey,
+      yDataKey: categoryDataKey,
+      baseX: baseX,
+      baseY: baseY,
+      verticalLayout: isVerticalLayout,
+      stackOffset: widget.stackOffset,
+    );
 
     final barRectsMap = <String, List<BarRect>>{};
     final totalBars = widget.barSeries.length;
@@ -456,7 +505,11 @@ class _ChartContentState extends State<_ChartContent>
       );
     }
 
-    final dataChanged = _hasDataChanged(linePointsMap, areaPointsMap, barRectsMap);
+    final dataChanged = _hasDataChanged(
+      linePointsMap,
+      areaPointsMap,
+      barRectsMap,
+    );
 
     if (dataChanged && !_isFirstBuild && widget.isAnimationActive) {
       _previousLinePointsMap = Map.from(_currentLinePointsMap);
@@ -475,29 +528,62 @@ class _ChartContentState extends State<_ChartContent>
     _isFirstBuild = false;
 
     final seriesInfoList = <SeriesInfo>[
-      ...widget.lineSeries.map((s) => SeriesInfo(
-            dataKey: s.dataKey,
-            name: s.name,
-            color: s.stroke,
-          )),
-      ...widget.areaSeries.map((s) => SeriesInfo(
-            dataKey: s.dataKey,
-            name: s.name,
-            color: s.stroke,
-          )),
-      ...widget.barSeries.map((s) => SeriesInfo(
-            dataKey: s.dataKey,
-            name: s.name,
-            color: s.fill,
-          )),
+      ...widget.lineSeries.map(
+        (s) => SeriesInfo(dataKey: s.dataKey, name: s.name, color: s.stroke),
+      ),
+      ...widget.areaSeries.map(
+        (s) => SeriesInfo(
+          dataKey: s.dataKey,
+          name: s.name,
+          color: s.stroke,
+          pointCoordinateForIndex: (index) {
+            final areaPoint = areaPointsMap[s.dataKey];
+            if (areaPoint == null || index < 0 || index >= areaPoint.length) {
+              return null;
+            }
+
+            final point = areaPoint[index];
+            if (point.isNull || point.y.isNaN || point.x.isNaN) {
+              return null;
+            }
+
+            return point.topOffset;
+          },
+          percentValueForIndex: (index) {
+            final areaPoint = areaPointsMap[s.dataKey];
+            if (areaPoint == null || index < 0 || index >= areaPoint.length) {
+              return null;
+            }
+
+            final point = areaPoint[index];
+            if (point.isNull || point.y.isNaN || point.baseY.isNaN) {
+              return null;
+            }
+
+            final topValue = scales.yScale.invert(point.y);
+            final baseValue = scales.yScale.invert(point.baseY);
+            if (topValue is! num || baseValue is! num) {
+              return null;
+            }
+
+            final ratio = (topValue.toDouble() - baseValue.toDouble()).abs();
+            return ratio.isFinite ? ratio : null;
+          },
+        ),
+      ),
+      ...widget.barSeries.map(
+        (s) => SeriesInfo(dataKey: s.dataKey, name: s.name, color: s.fill),
+      ),
     ];
 
-    _controller ??= ChartInteractionController(
+    _controller = ChartInteractionController(
       data: widget.dataSet,
       layout: layout,
       xScale: scales.xScale,
       yScale: scales.yScale,
       xDataKey: xDataKey ?? 'name',
+      categoryDataKey: categoryDataKey,
+      verticalLayout: isVerticalLayout,
       seriesInfoList: seriesInfoList,
       onStateChanged: _handleStateChanged,
     );
@@ -507,10 +593,19 @@ class _ChartContentState extends State<_ChartContent>
 
     if (_interactionState.isActive && _interactionState.activeIndex != null) {
       final index = _interactionState.activeIndex!;
-      final point = widget.dataSet[index];
-      final xValue = point[xDataKey ?? 'name'];
-      if (xValue != null) {
-        activeX = scales.xScale(xValue) + (scales.xScale.bandwidth ?? 0) / 2;
+      if (isVerticalLayout) {
+        final anchorDataKey = seriesInfoList.isNotEmpty
+            ? seriesInfoList.first.dataKey
+            : null;
+        if (anchorDataKey != null) {
+          activeX = _controller!.getPointCoordinate(index, anchorDataKey)?.dx;
+        }
+      } else {
+        final point = widget.dataSet[index];
+        final xValue = point[xDataKey ?? 'name'];
+        if (xValue != null) {
+          activeX = scales.xScale(xValue) + (scales.xScale.bandwidth ?? 0) / 2;
+        }
       }
 
       activePoints = seriesInfoList
@@ -536,6 +631,8 @@ class _ChartContentState extends State<_ChartContent>
           lineSeries: widget.lineSeries,
           areaSeries: widget.areaSeries,
           barSeries: widget.barSeries,
+          stackOffset: widget.stackOffset,
+          referenceLines: widget.referenceLines,
           xScale: scales.xScale,
           yScale: scales.yScale,
           linePointsMap: linePointsMap,
@@ -587,6 +684,18 @@ class _ChartContentState extends State<_ChartContent>
     return chartWidget;
   }
 
+  bool _isVerticalLayout(XAxis xAxis, YAxis yAxis) {
+    return _isCategoricalScaleType(yAxis.type) &&
+        !_isCategoricalScaleType(xAxis.type);
+  }
+
+  bool _isCategoricalScaleType(ScaleType type) {
+    return type == ScaleType.category ||
+        type == ScaleType.band ||
+        type == ScaleType.point ||
+        type == ScaleType.ordinal;
+  }
+
   bool _hasDataChanged(
     Map<String, List<LinePoint>> linePointsMap,
     Map<String, List<AreaPoint>> areaPointsMap,
@@ -624,6 +733,7 @@ class _ChartContentState extends State<_ChartContent>
       for (int i = 0; i < current.length; i++) {
         if (current[i].x != next[i].x ||
             current[i].y != next[i].y ||
+            current[i].baseX != next[i].baseX ||
             current[i].baseY != next[i].baseY) {
           return true;
         }

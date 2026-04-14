@@ -20,10 +20,7 @@ void main() {
       range: [0, 400],
     );
 
-    final yScale = LinearScale(
-      domain: [0, 300],
-      range: [300, 0],
-    );
+    final yScale = LinearScale(domain: [0, 300], range: [300, 0]);
 
     test('computes correct number of points', () {
       final points = computeLinePoints(
@@ -120,6 +117,29 @@ void main() {
       expect(points[1].value, 200);
       expect(points[2].value, 150);
       expect(points[3].value, 300);
+    });
+
+    test('computes vertical layout points with category Y and numeric X', () {
+      final verticalYScale = BandScale<String>(
+        domain: ['A', 'B', 'C', 'D'],
+        range: [0, 400],
+      );
+      final verticalXScale = LinearScale(domain: [0, 300], range: [0, 600]);
+
+      final points = computeLinePoints(
+        data: testData,
+        series: const LineSeries(dataKey: 'value'),
+        xScale: verticalXScale,
+        yScale: verticalYScale,
+        yDataKey: 'name',
+        verticalLayout: true,
+      );
+
+      final yBandwidth = verticalYScale.bandwidth;
+      expect(points[0].x, verticalXScale(100));
+      expect(points[0].y, verticalYScale('A') + yBandwidth / 2);
+      expect(points[3].x, verticalXScale(300));
+      expect(points[3].y, verticalYScale('D') + yBandwidth / 2);
     });
   });
 }

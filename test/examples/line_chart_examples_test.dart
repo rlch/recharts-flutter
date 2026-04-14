@@ -26,47 +26,45 @@ void main() {
   Widget wrapChart(Widget child, {double width = 400, double height = 300}) {
     return MaterialApp(
       home: Scaffold(
-        body: SizedBox(
-          width: width,
-          height: height,
-          child: child,
-        ),
+        body: SizedBox(width: width, height: height, child: child),
       ),
     );
   }
 
   group('SimpleLineChart', () {
     testWidgets('renders with two line series', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: pageData,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          grid: const CartesianGrid(
-            horizontal: true,
-            vertical: true,
-            strokeDasharray: [3, 3],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            grid: const CartesianGrid(
+              horizontal: true,
+              vertical: true,
+              strokeDasharray: [3, 3],
+            ),
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(
+                dataKey: 'pv',
+                name: 'Page Views',
+                stroke: Color(0xFF8884D8),
+                strokeWidth: 2,
+                curveType: CurveType.monotone,
+              ),
+              LineSeries(
+                dataKey: 'uv',
+                name: 'Unique Visitors',
+                stroke: Color(0xFF82CA9D),
+                strokeWidth: 2,
+                curveType: CurveType.monotone,
+              ),
+            ],
+            tooltip: const ChartTooltip(),
           ),
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(
-              dataKey: 'pv',
-              name: 'Page Views',
-              stroke: Color(0xFF8884D8),
-              strokeWidth: 2,
-              curveType: CurveType.monotone,
-            ),
-            LineSeries(
-              dataKey: 'uv',
-              name: 'Unique Visitors',
-              stroke: Color(0xFF82CA9D),
-              strokeWidth: 2,
-              curveType: CurveType.monotone,
-            ),
-          ],
-          tooltip: const ChartTooltip(),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -75,17 +73,19 @@ void main() {
     });
 
     testWidgets('renders with correct data', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: pageData,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -95,29 +95,31 @@ void main() {
 
   group('BiaxialLineChart', () {
     testWidgets('renders with two Y axes', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: pageData,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [
-            YAxis(id: 'left', orientation: AxisOrientation.left),
-            YAxis(id: 'right', orientation: AxisOrientation.right),
-          ],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(
-              dataKey: 'pv',
-              yAxisId: 'left',
-              stroke: Color(0xFF8884D8),
-            ),
-            LineSeries(
-              dataKey: 'uv',
-              yAxisId: 'right',
-              stroke: Color(0xFF82CA9D),
-            ),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [
+              YAxis(id: 'left', orientation: AxisOrientation.left),
+              YAxis(id: 'right', orientation: AxisOrientation.right),
+            ],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(
+                dataKey: 'pv',
+                yAxisId: 'left',
+                stroke: Color(0xFF8884D8),
+              ),
+              LineSeries(
+                dataKey: 'uv',
+                yAxisId: 'right',
+                stroke: Color(0xFF82CA9D),
+              ),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -125,23 +127,49 @@ void main() {
     });
   });
 
+  group('VerticalLineChart', () {
+    testWidgets('renders with linear X and category Y axes', (tester) async {
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(type: ScaleType.linear)],
+            yAxes: const [YAxis(dataKey: 'name', type: ScaleType.category)],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
+              LineSeries(dataKey: 'uv', stroke: Color(0xFF82CA9D)),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CartesianChartWidget), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+  });
+
   group('LineChartConnectNulls', () {
     testWidgets('renders with connectNulls: false (default)', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: dataWithNulls,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(
-              dataKey: 'uv',
-              stroke: Color(0xFF8884D8),
-              connectNulls: false,
-            ),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: dataWithNulls,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(
+                dataKey: 'uv',
+                stroke: Color(0xFF8884D8),
+                connectNulls: false,
+              ),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -149,21 +177,23 @@ void main() {
     });
 
     testWidgets('renders with connectNulls: true', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: dataWithNulls,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(
-              dataKey: 'uv',
-              stroke: Color(0xFF82CA9D),
-              connectNulls: true,
-            ),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: dataWithNulls,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(
+                dataKey: 'uv',
+                stroke: Color(0xFF82CA9D),
+                connectNulls: true,
+              ),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -171,19 +201,65 @@ void main() {
     });
   });
 
+  group('LineChartWithReferenceLines', () {
+    testWidgets('renders with horizontal and vertical reference lines', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
+              LineSeries(dataKey: 'uv', stroke: Color(0xFF82CA9D)),
+            ],
+            referenceLines: const [
+              ReferenceLine(
+                y: 1520,
+                stroke: Color(0xFFE53935),
+                strokeWidth: 2,
+                strokeDasharray: [6, 4],
+                label: 'Max Y (1520)',
+                isFront: true,
+              ),
+              ReferenceLine(
+                x: 'Page F',
+                stroke: Color(0xFFE53935),
+                strokeWidth: 2,
+                strokeDasharray: [6, 4],
+                label: 'Max X (Page F)',
+                isFront: true,
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CartesianChartWidget), findsOneWidget);
+      expect(find.byType(CustomPaint), findsWidgets);
+    });
+  });
+
   group('LineChart edge cases', () {
     testWidgets('handles empty data', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: const [],
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: const [],
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -191,17 +267,19 @@ void main() {
     });
 
     testWidgets('handles single data point', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: [pageData.first],
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: [pageData.first],
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8)),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -210,46 +288,53 @@ void main() {
 
     testWidgets('handles multiple curve types', (tester) async {
       for (final curveType in CurveType.values) {
-        await tester.pumpWidget(wrapChart(
+        await tester.pumpWidget(
+          wrapChart(
+            CartesianChartWidget(
+              data: pageData,
+              xAxes: const [XAxis(dataKey: 'name')],
+              yAxes: const [YAxis()],
+              isAnimationActive: false,
+              lineSeries: [
+                LineSeries(
+                  dataKey: 'pv',
+                  stroke: const Color(0xFF8884D8),
+                  curveType: curveType,
+                ),
+              ],
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byType(CartesianChartWidget),
+          findsOneWidget,
+          reason: 'Failed with curveType: $curveType',
+        );
+      }
+    });
+
+    testWidgets('renders with dots enabled', (tester) async {
+      await tester.pumpWidget(
+        wrapChart(
           CartesianChartWidget(
             data: pageData,
             xAxes: const [XAxis(dataKey: 'name')],
             yAxes: const [YAxis()],
             isAnimationActive: false,
-            lineSeries: [
+            lineSeries: const [
               LineSeries(
                 dataKey: 'pv',
-                stroke: const Color(0xFF8884D8),
-                curveType: curveType,
+                stroke: Color(0xFF8884D8),
+                dot: true,
+                dotConfig: DotConfig(radius: 6),
               ),
             ],
           ),
-        ));
-
-        await tester.pumpAndSettle();
-
-        expect(find.byType(CartesianChartWidget), findsOneWidget,
-            reason: 'Failed with curveType: $curveType');
-      }
-    });
-
-    testWidgets('renders with dots enabled', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: pageData,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(
-              dataKey: 'pv',
-              stroke: Color(0xFF8884D8),
-              dot: true,
-              dotConfig: DotConfig(radius: 6),
-            ),
-          ],
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -257,18 +342,20 @@ void main() {
     });
 
     testWidgets('renders with hide = true', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: pageData,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8), hide: true),
-            LineSeries(dataKey: 'uv', stroke: Color(0xFF82CA9D)),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(dataKey: 'pv', stroke: Color(0xFF8884D8), hide: true),
+              LineSeries(dataKey: 'uv', stroke: Color(0xFF82CA9D)),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 
@@ -276,26 +363,28 @@ void main() {
     });
 
     testWidgets('renders with different stroke widths', (tester) async {
-      await tester.pumpWidget(wrapChart(
-        CartesianChartWidget(
-          data: pageData,
-          xAxes: const [XAxis(dataKey: 'name')],
-          yAxes: const [YAxis()],
-          isAnimationActive: false,
-          lineSeries: const [
-            LineSeries(
-              dataKey: 'pv',
-              stroke: Color(0xFF8884D8),
-              strokeWidth: 1,
-            ),
-            LineSeries(
-              dataKey: 'uv',
-              stroke: Color(0xFF82CA9D),
-              strokeWidth: 4,
-            ),
-          ],
+      await tester.pumpWidget(
+        wrapChart(
+          CartesianChartWidget(
+            data: pageData,
+            xAxes: const [XAxis(dataKey: 'name')],
+            yAxes: const [YAxis()],
+            isAnimationActive: false,
+            lineSeries: const [
+              LineSeries(
+                dataKey: 'pv',
+                stroke: Color(0xFF8884D8),
+                strokeWidth: 1,
+              ),
+              LineSeries(
+                dataKey: 'uv',
+                stroke: Color(0xFF82CA9D),
+                strokeWidth: 4,
+              ),
+            ],
+          ),
         ),
-      ));
+      );
 
       await tester.pumpAndSettle();
 

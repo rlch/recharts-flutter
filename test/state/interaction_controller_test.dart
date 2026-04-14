@@ -181,8 +181,10 @@ void main() {
       test('creates payload with correct index and label', () {
         final controller = createController();
 
-        final payload =
-            controller.buildTooltipPayload(0, const Offset(100, 150));
+        final payload = controller.buildTooltipPayload(
+          0,
+          const Offset(100, 150),
+        );
 
         expect(payload.index, 0);
         expect(payload.label, 'A');
@@ -192,8 +194,10 @@ void main() {
       test('includes entries for all series', () {
         final controller = createController();
 
-        final payload =
-            controller.buildTooltipPayload(0, const Offset(100, 150));
+        final payload = controller.buildTooltipPayload(
+          0,
+          const Offset(100, 150),
+        );
 
         expect(payload.entries.length, 2);
         expect(payload.entries[0].name, 'Value 1');
@@ -203,6 +207,32 @@ void main() {
         expect(payload.entries[1].value, 50);
       });
 
+      test('includes percent value when provided by series info', () {
+        final controller = ChartInteractionController(
+          data: testData,
+          layout: layout,
+          xScale: xScale,
+          yScale: yScale,
+          xDataKey: 'name',
+          seriesInfoList: const [
+            SeriesInfo(
+              dataKey: 'value',
+              name: 'Value 1',
+              color: Color(0xFF8884d8),
+              percentValueForIndex: _percentAtQuarter,
+            ),
+          ],
+          onStateChanged: (_) {},
+        );
+
+        final payload = controller.buildTooltipPayload(
+          0,
+          const Offset(100, 150),
+        );
+
+        expect(payload.entries.single.percentValue, 0.25);
+      });
+
       test('skips null values', () {
         final dataWithNull = ChartDataSet([
           {'name': 'A', 'value': 100, 'value2': null},
@@ -210,8 +240,10 @@ void main() {
 
         final controller = createController(data: dataWithNull);
 
-        final payload =
-            controller.buildTooltipPayload(0, const Offset(100, 150));
+        final payload = controller.buildTooltipPayload(
+          0,
+          const Offset(100, 150),
+        );
 
         expect(payload.entries.length, 1);
         expect(payload.entries[0].name, 'Value 1');
@@ -225,10 +257,7 @@ void main() {
           onStateChanged: (state) => capturedState = state,
         );
 
-        final inPlotArea = Offset(
-          layout.plotLeft + 50,
-          layout.plotTop + 50,
-        );
+        final inPlotArea = Offset(layout.plotLeft + 50, layout.plotTop + 50);
 
         controller.onPointerMove(inPlotArea);
 
@@ -236,6 +265,10 @@ void main() {
         expect(capturedState!.isActive, true);
         expect(capturedState!.activeIndex, isNotNull);
         expect(capturedState!.tooltipPayload, isNotNull);
+        expect(
+          capturedState!.activeCoordinate,
+          controller.getTooltipAnchorCoordinate(capturedState!.activeIndex!),
+        );
       });
 
       test('calls onPointerExit when pointer leaves plot area', () {
@@ -244,8 +277,9 @@ void main() {
           onStateChanged: (state) => capturedState = state,
         );
 
-        controller
-            .onPointerMove(Offset(layout.plotLeft + 50, layout.plotTop + 50));
+        controller.onPointerMove(
+          Offset(layout.plotLeft + 50, layout.plotTop + 50),
+        );
         expect(capturedState!.isActive, true);
 
         controller.onPointerMove(const Offset(0, 0));
@@ -260,8 +294,9 @@ void main() {
           onStateChanged: (state) => capturedState = state,
         );
 
-        controller
-            .onPointerMove(Offset(layout.plotLeft + 50, layout.plotTop + 50));
+        controller.onPointerMove(
+          Offset(layout.plotLeft + 50, layout.plotTop + 50),
+        );
         expect(capturedState!.isActive, true);
 
         controller.onPointerExit();
@@ -304,6 +339,119 @@ void main() {
         final coord = controller.getPointCoordinate(0, 'value');
         expect(coord, isNull);
       });
+
+      test('returns correct coordinate for vertical layout', () {
+        final verticalYScale = BandScale<String>(
+          domain: ['A', 'B', 'C', 'D'],
+          range: [layout.plotTop, layout.plotBottom],
+        );
+        final verticalXScale = LinearScale(
+          domain: [0, 300],
+          range: [layout.plotLeft, layout.plotRight],
+        );
+
+        final controller = ChartInteractionController(
+          data: testData,
+          layout: layout,
+          xScale: verticalXScale,
+          yScale: verticalYScale,
+          xDataKey: 'value',
+          categoryDataKey: 'name',
+          verticalLayout: true,
+          seriesInfoList: seriesInfoList,
+          onStateChanged: (_) {},
+        );
+
+        final coord = controller.getPointCoordinate(0, 'value');
+
+        expect(coord, isNotNull);
+        expect(coord!.dx, verticalXScale(100));
+        expect(coord.dy, verticalYScale('A') + (verticalYScale.bandwidth / 2));
+      });
+    });
+
+    group('getTooltipAnchorCoordinate', () {
+      test('returns first non-null series coordinate', () {
+        final controller = createController();
+
+        final coord = controller.getTooltipAnchorCoordinate(0);
+
+        expect(coord, controller.getPointCoordinate(0, 'value'));
+      });
+
+      test('returns null when no series has a value at index', () {
+        final dataWithNulls = ChartDataSet([
+          {'name': 'A', 'value': null, 'value2': null},
+        ]);
+
+        final controller = createController(data: dataWithNulls);
+
+        final coord = controller.getTooltipAnchorCoordinate(0);
+        expect(coord, isNull);
+      });
+    });
+
+    group('vertical layout interaction', () {
+      test('finds nearest index by Y position', () {
+        final verticalYScale = BandScale<String>(
+          domain: ['A', 'B', 'C', 'D'],
+          range: [layout.plotTop, layout.plotBottom],
+        );
+        final verticalXScale = LinearScale(
+          domain: [0, 300],
+          range: [layout.plotLeft, layout.plotRight],
+        );
+
+        final controller = ChartInteractionController(
+          data: testData,
+          layout: layout,
+          xScale: verticalXScale,
+          yScale: verticalYScale,
+          xDataKey: 'value',
+          categoryDataKey: 'name',
+          verticalLayout: true,
+          seriesInfoList: seriesInfoList,
+          onStateChanged: (_) {},
+        );
+
+        final y = verticalYScale('C') + verticalYScale.bandwidth / 2;
+        final index = controller.findNearestIndex(
+          Offset(layout.plotLeft + 10, y),
+        );
+
+        expect(index, 2);
+      });
+
+      test('uses category axis key for tooltip label', () {
+        final verticalYScale = BandScale<String>(
+          domain: ['A', 'B', 'C', 'D'],
+          range: [layout.plotTop, layout.plotBottom],
+        );
+        final verticalXScale = LinearScale(
+          domain: [0, 300],
+          range: [layout.plotLeft, layout.plotRight],
+        );
+
+        final controller = ChartInteractionController(
+          data: testData,
+          layout: layout,
+          xScale: verticalXScale,
+          yScale: verticalYScale,
+          xDataKey: 'value',
+          categoryDataKey: 'name',
+          verticalLayout: true,
+          seriesInfoList: seriesInfoList,
+          onStateChanged: (_) {},
+        );
+
+        final payload = controller.buildTooltipPayload(
+          1,
+          const Offset(100, 120),
+        );
+        expect(payload.label, 'B');
+      });
     });
   });
 }
+
+double _percentAtQuarter(int _) => 0.25;

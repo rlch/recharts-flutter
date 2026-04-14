@@ -6,6 +6,8 @@ import '../grid/cartesian_grid.dart';
 import '../series/line_series.dart';
 import '../series/area_series.dart';
 import '../series/bar_series.dart';
+import '../reference/reference_line.dart';
+import '../reference/reference_line_painter.dart';
 import 'axis_painter.dart';
 import 'grid_painter.dart';
 import 'line_series_painter.dart';
@@ -25,6 +27,7 @@ class CartesianChartPainter extends CustomPainter {
   final List<LineSeries> lineSeries;
   final List<AreaSeries> areaSeries;
   final List<BarSeries> barSeries;
+  final List<ReferenceLine> referenceLines;
   final Scale<dynamic, double> xScale;
   final Scale<dynamic, double> yScale;
   final Map<String, List<LinePoint>> linePointsMap;
@@ -42,6 +45,7 @@ class CartesianChartPainter extends CustomPainter {
     required this.lineSeries,
     required this.areaSeries,
     required this.barSeries,
+    this.referenceLines = const [],
     required this.xScale,
     required this.yScale,
     required this.linePointsMap,
@@ -58,6 +62,8 @@ class CartesianChartPainter extends CustomPainter {
 
     _paintGrid(canvas, size);
 
+    _paintReferenceLines(canvas, size, isFront: false);
+
     _paintAreas(canvas, size);
 
     _paintBars(canvas, size);
@@ -66,7 +72,23 @@ class CartesianChartPainter extends CustomPainter {
 
     _paintAxes(canvas, size);
 
+    _paintReferenceLines(canvas, size, isFront: true);
+
     _paintCursor(canvas, size);
+  }
+
+  void _paintReferenceLines(Canvas canvas, Size size, {required bool isFront}) {
+    for (final line in referenceLines) {
+      if (line.isFront != isFront) continue;
+
+      final painter = ReferenceLinePainter(
+        line: line,
+        layout: layout,
+        xScale: xScale,
+        yScale: yScale,
+      );
+      painter.paint(canvas, size);
+    }
   }
 
   void _paintCursor(Canvas canvas, Size size) {
@@ -98,8 +120,9 @@ class CartesianChartPainter extends CustomPainter {
       horizontalLines.addAll(grid!.horizontalPoints!);
     } else {
       final yTicks = yScale.ticks(5);
+      final yBandwidth = yScale.bandwidth ?? 0;
       for (final tick in yTicks) {
-        horizontalLines.add(yScale(tick));
+        horizontalLines.add(yScale(tick) + yBandwidth / 2);
       }
     }
 
