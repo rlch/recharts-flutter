@@ -6,7 +6,6 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'converter_lab.dart';
 
 // Line Chart Examples
 import 'examples/line_chart/simple_line_chart.dart';
@@ -401,7 +400,6 @@ class ChartGallery extends StatefulWidget {
 class _ChartGalleryState extends State<ChartGallery> {
   int _selectedCategoryIndex = 0;
   int _selectedExampleIndex = 0;
-  int _selectedTabIndex = 0;
   bool _showCode = false;
 
   ExampleCategory get _currentCategory => categories[_selectedCategoryIndex];
@@ -410,7 +408,6 @@ class _ChartGalleryState extends State<ChartGallery> {
 
   void _selectExample(int categoryIndex, int exampleIndex) {
     setState(() {
-      _selectedTabIndex = 0;
       _selectedCategoryIndex = categoryIndex;
       _selectedExampleIndex = exampleIndex;
       _showCode = false;
@@ -420,58 +417,31 @@ class _ChartGalleryState extends State<ChartGallery> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      initialIndex: _selectedTabIndex,
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(
-            _selectedTabIndex == 0 ? _currentExample.title : 'Converter Lab',
-          ),
-          bottom: TabBar(
-            onTap: (index) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_currentExample.title),
+        actions: [
+          IconButton(
+            icon: Icon(_showCode ? Icons.visibility : Icons.code),
+            tooltip: _showCode ? 'Show Chart' : 'Show Code',
+            onPressed: () {
               setState(() {
-                _selectedTabIndex = index;
+                _showCode = !_showCode;
               });
             },
-            tabs: const [
-              Tab(text: 'Gallery', icon: Icon(Icons.grid_view)),
-              Tab(text: 'Converter', icon: Icon(Icons.auto_fix_high)),
-            ],
           ),
-          actions: [
-            if (_selectedTabIndex == 0)
-              IconButton(
-                icon: Icon(_showCode ? Icons.visibility : Icons.code),
-                tooltip: _showCode ? 'Show Chart' : 'Show Code',
-                onPressed: () {
-                  setState(() {
-                    _showCode = !_showCode;
-                  });
-                },
-              ),
-            IconButton(
-              icon:
-                  Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
-              tooltip: 'Toggle Theme',
-              onPressed: widget.onThemeToggle,
-            ),
-          ],
-        ),
-        drawer: _buildDrawer(),
-        body: IndexedStack(
-          index: _selectedTabIndex,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: _showCode ? _buildCodeView() : _buildChartView(),
-            ),
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: ConverterLab(),
-            ),
-          ],
-        ),
+          IconButton(
+            icon:
+                Icon(widget.isDarkMode ? Icons.light_mode : Icons.dark_mode),
+            tooltip: 'Toggle Theme',
+            onPressed: widget.onThemeToggle,
+          ),
+        ],
+      ),
+      drawer: _buildDrawer(),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: _showCode ? _buildCodeView() : _buildChartView(),
       ),
     );
   }
