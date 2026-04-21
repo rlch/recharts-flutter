@@ -114,25 +114,50 @@ class AxisPainter {
     final bandwidth = scale.bandwidth ?? 0;
     final xOffset = bandwidth / 2;
 
+    // Layout all labels up front so we can detect overlap and stride-skip.
+    // Labels are centered on each tick, so two neighbours collide when
+    // the sum of their half-widths + gap exceeds the tick spacing.
+    const labelGap = 6.0;
+    final painters = <TextPainter>[];
+    final xs = <double>[];
     for (final tick in ticks) {
       final x = scale(tick) + xOffset;
+      final painter = TextPainter(
+        text: TextSpan(
+          text: _formatLabel(tick),
+          style: TextStyle(color: labelColor, fontSize: 12),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      painters.add(painter);
+      xs.add(x);
+    }
+
+    int stride = 1;
+    if (painters.length > 1) {
+      final plotWidth = plotEnd - plotStart;
+      // Use the widest label as the worst-case footprint for stride math.
+      var maxWidth = 0.0;
+      for (final p in painters) {
+        if (p.width > maxWidth) maxWidth = p.width;
+      }
+      final slotsThatFit = (plotWidth / (maxWidth + labelGap)).floor();
+      if (slotsThatFit > 0 && painters.length > slotsThatFit) {
+        stride = (painters.length / slotsThatFit).ceil();
+      }
+    }
+
+    for (var i = 0; i < painters.length; i++) {
+      final x = xs[i];
       if (x < plotStart || x > plotEnd) continue;
 
       final tickStart = isTop ? axisPosition - tickSize : axisPosition;
       final tickEnd = isTop ? axisPosition : axisPosition + tickSize;
-
       canvas.drawLine(Offset(x, tickStart), Offset(x, tickEnd), axisPaint);
 
-      final label = _formatLabel(tick);
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: TextStyle(color: labelColor, fontSize: 12),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
+      if (stride > 1 && i % stride != 0) continue;
 
+      final textPainter = painters[i];
       final labelY = isTop
           ? axisPosition - tickSize - tickMargin - textPainter.height
           : axisPosition + tickSize + tickMargin;
@@ -179,17 +204,24 @@ class AxisPainter {
     }
   }
 
-  String _formatLabel(dynamic value) {
-    if (tickFormatter != null) {
-      return tickFormatter!(value);
-    }
+  String _formatLabel(dynamic value) =>
+      formatAxisLabel(value, unit: unit, tickFormatter: tickFormatter);
+}
 
-    if (value is double) {
-      if (value == value.toInt()) {
-        return '${value.toInt()}${unit ?? ''}';
-      }
-      return '${value.toStringAsFixed(1)}${unit ?? ''}';
-    }
-    return '$value${unit ?? ''}';
+String formatAxisLabel(
+  dynamic value, {
+  String? unit,
+  AxisTickFormatter? tickFormatter,
+}) {
+  if (tickFormatter != null) {
+    return tickFormatter(value);
   }
+
+  if (value is double) {
+    if (value == value.toInt()) {
+      return '${value.toInt()}${unit ?? ''}';
+    }
+    return '${value.toStringAsFixed(1)}${unit ?? ''}';
+  }
+  return '$value${unit ?? ''}';
 }
