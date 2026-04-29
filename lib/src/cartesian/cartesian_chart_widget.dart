@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart:math' as math;
+
 import '../core/types/chart_data.dart';
 import '../core/types/axis_types.dart';
 import '../core/types/series_types.dart';
@@ -12,6 +14,8 @@ import 'series/line_series.dart';
 import 'series/area_series.dart';
 import 'series/bar_series.dart';
 import 'painters/animated_cartesian_chart_painter.dart';
+import 'painters/axis_painter.dart';
+import '../state/models/cartesian_scales.dart';
 import '../state/models/chart_layout.dart';
 import '../state/models/computed_data.dart';
 import '../state/models/interaction_state.dart';
@@ -424,11 +428,6 @@ class _ChartContentState extends State<_ChartContent>
 
   @override
   Widget build(BuildContext context) {
-    final layout = computeChartLayout(
-      size: Size(widget.width, widget.height),
-      margin: widget.margin,
-    );
-
     final effectiveXAxes = widget.xAxes.isNotEmpty
         ? widget.xAxes
         : [const XAxis()];
@@ -445,7 +444,12 @@ class _ChartContentState extends State<_ChartContent>
       ...widget.barSeries.map((s) => s.dataKey),
     ];
 
-    final scales = buildCartesianScales(
+    var layout = computeChartLayout(
+      size: Size(widget.width, widget.height),
+      margin: widget.margin,
+    );
+
+    var scales = buildCartesianScales(
       data: widget.dataSet,
       layout: layout,
       xAxes: effectiveXAxes,
@@ -454,6 +458,31 @@ class _ChartContentState extends State<_ChartContent>
       areaSeries: widget.areaSeries,
       stackOffset: widget.stackOffset,
     );
+
+    // Expand horizontal margin when y-axis labels overflow the default padding,
+    // otherwise long labels get clipped at the chart edge. Y-scale range is
+    // vertical-only, so we can re-derive the x-scale with adjusted plot width
+    // without invalidating the y-scale ticks we measured.
+    final adjustedMargin = _fitYAxisMargin(
+      userMargin: widget.margin,
+      yAxes: effectiveYAxes,
+      scales: scales,
+    );
+    if (adjustedMargin != null) {
+      layout = computeChartLayout(
+        size: Size(widget.width, widget.height),
+        margin: adjustedMargin,
+      );
+      scales = buildCartesianScales(
+        data: widget.dataSet,
+        layout: layout,
+        xAxes: effectiveXAxes,
+        yAxes: effectiveYAxes,
+        yDataKeys: yDataKeys,
+        areaSeries: widget.areaSeries,
+        stackOffset: widget.stackOffset,
+      );
+    }
 
     final xDataKey = primaryXAxis.dataKey;
     final categoryDataKey = isVerticalLayout
@@ -753,5 +782,54 @@ class _ChartContentState extends State<_ChartContent>
     }
 
     return false;
+  }
+
+  ChartMargin? _fitYAxisMargin({
+    required ChartMargin? userMargin,
+    required List<YAxis> yAxes,
+    required CartesianScales scales,
+  }) {
+    const tickSize = 6.0;
+    const labelBuffer = 4.0;
+    double leftRequired = 0;
+    double rightRequired = 0;
+
+    for (final axis in yAxes) {
+      if (axis.hide) continue;
+      final scale = scales.getYScale(axis.id);
+      final ticks = axis.ticks ?? scale.ticks(axis.tickCount ?? 5);
+      if (ticks.isEmpty) continue;
+
+      double maxLabelWidth = 0;
+      for (final tick in ticks) {
+        final text = formatAxisLabel(
+          tick,
+          unit: axis.unit,
+          tickFormatter: axis.tickFormatter,
+        );
+        final painter = TextPainter(
+          text: TextSpan(
+            text: text,
+            style: const TextStyle(fontSize: 12),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        if (painter.width > maxLabelWidth) maxLabelWidth = painter.width;
+      }
+
+      final required =
+          maxLabelWidth + tickSize + (axis.tickMargin ?? 3) + labelBuffer;
+      if (axis.orientation == AxisOrientation.right) {
+        rightRequired = math.max(rightRequired, required);
+      } else {
+        leftRequired = math.max(leftRequired, required);
+      }
+    }
+
+    final base = userMargin ?? const ChartMargin();
+    final newLeft = math.max(base.left, leftRequired);
+    final newRight = math.max(base.right, rightRequired);
+    if (newLeft == base.left && newRight == base.right) return null;
+    return base.copyWith(left: newLeft, right: newRight);
   }
 }

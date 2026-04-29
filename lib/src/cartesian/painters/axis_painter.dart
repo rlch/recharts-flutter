@@ -114,25 +114,61 @@ class AxisPainter {
     final bandwidth = scale.bandwidth ?? 0;
     final xOffset = bandwidth / 2;
 
+    // Layout all labels at base font size, then scale down uniformly if the
+    // widest would collide with its neighbour. Keeps every label visible.
+    const labelGap = 6.0;
+    const baseFontSize = 12.0;
+    const minFontSize = 8.0;
+
+    final painters = <TextPainter>[];
+    final xs = <double>[];
     for (final tick in ticks) {
       final x = scale(tick) + xOffset;
+      final painter = TextPainter(
+        text: TextSpan(
+          text: _formatLabel(tick),
+          style: TextStyle(color: labelColor, fontSize: baseFontSize),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      painters.add(painter);
+      xs.add(x);
+    }
+
+    if (painters.length > 1) {
+      final plotWidth = plotEnd - plotStart;
+      final slotWidth = plotWidth / painters.length;
+      var maxWidth = 0.0;
+      for (final p in painters) {
+        if (p.width > maxWidth) maxWidth = p.width;
+      }
+      final allowed = slotWidth - labelGap;
+      if (allowed > 0 && maxWidth > allowed) {
+        final scaled = (baseFontSize * allowed / maxWidth)
+            .clamp(minFontSize, baseFontSize);
+        if (scaled < baseFontSize) {
+          for (var i = 0; i < painters.length; i++) {
+            painters[i] = TextPainter(
+              text: TextSpan(
+                text: _formatLabel(ticks[i]),
+                style: TextStyle(color: labelColor, fontSize: scaled),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout();
+          }
+        }
+      }
+    }
+
+    for (var i = 0; i < painters.length; i++) {
+      final x = xs[i];
       if (x < plotStart || x > plotEnd) continue;
 
       final tickStart = isTop ? axisPosition - tickSize : axisPosition;
       final tickEnd = isTop ? axisPosition : axisPosition + tickSize;
-
       canvas.drawLine(Offset(x, tickStart), Offset(x, tickEnd), axisPaint);
 
-      final label = _formatLabel(tick);
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: label,
-          style: TextStyle(color: labelColor, fontSize: 12),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-
+      final textPainter = painters[i];
       final labelY = isTop
           ? axisPosition - tickSize - tickMargin - textPainter.height
           : axisPosition + tickSize + tickMargin;
@@ -179,17 +215,24 @@ class AxisPainter {
     }
   }
 
-  String _formatLabel(dynamic value) {
-    if (tickFormatter != null) {
-      return tickFormatter!(value);
-    }
+  String _formatLabel(dynamic value) =>
+      formatAxisLabel(value, unit: unit, tickFormatter: tickFormatter);
+}
 
-    if (value is double) {
-      if (value == value.toInt()) {
-        return '${value.toInt()}${unit ?? ''}';
-      }
-      return '${value.toStringAsFixed(1)}${unit ?? ''}';
-    }
-    return '$value${unit ?? ''}';
+String formatAxisLabel(
+  dynamic value, {
+  String? unit,
+  AxisTickFormatter? tickFormatter,
+}) {
+  if (tickFormatter != null) {
+    return tickFormatter(value);
   }
+
+  if (value is double) {
+    if (value == value.toInt()) {
+      return '${value.toInt()}${unit ?? ''}';
+    }
+    return '${value.toStringAsFixed(1)}${unit ?? ''}';
+  }
+  return '$value${unit ?? ''}';
 }
