@@ -114,10 +114,12 @@ class AxisPainter {
     final bandwidth = scale.bandwidth ?? 0;
     final xOffset = bandwidth / 2;
 
-    // Layout all labels up front so we can detect overlap and stride-skip.
-    // Labels are centered on each tick, so two neighbours collide when
-    // the sum of their half-widths + gap exceeds the tick spacing.
+    // Layout all labels at base font size, then scale down uniformly if the
+    // widest would collide with its neighbour. Keeps every label visible.
     const labelGap = 6.0;
+    const baseFontSize = 12.0;
+    const minFontSize = 8.0;
+
     final painters = <TextPainter>[];
     final xs = <double>[];
     for (final tick in ticks) {
@@ -125,7 +127,7 @@ class AxisPainter {
       final painter = TextPainter(
         text: TextSpan(
           text: _formatLabel(tick),
-          style: TextStyle(color: labelColor, fontSize: 12),
+          style: TextStyle(color: labelColor, fontSize: baseFontSize),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
@@ -133,17 +135,28 @@ class AxisPainter {
       xs.add(x);
     }
 
-    int stride = 1;
     if (painters.length > 1) {
       final plotWidth = plotEnd - plotStart;
-      // Use the widest label as the worst-case footprint for stride math.
+      final slotWidth = plotWidth / painters.length;
       var maxWidth = 0.0;
       for (final p in painters) {
         if (p.width > maxWidth) maxWidth = p.width;
       }
-      final slotsThatFit = (plotWidth / (maxWidth + labelGap)).floor();
-      if (slotsThatFit > 0 && painters.length > slotsThatFit) {
-        stride = (painters.length / slotsThatFit).ceil();
+      final allowed = slotWidth - labelGap;
+      if (allowed > 0 && maxWidth > allowed) {
+        final scaled = (baseFontSize * allowed / maxWidth)
+            .clamp(minFontSize, baseFontSize);
+        if (scaled < baseFontSize) {
+          for (var i = 0; i < painters.length; i++) {
+            painters[i] = TextPainter(
+              text: TextSpan(
+                text: _formatLabel(ticks[i]),
+                style: TextStyle(color: labelColor, fontSize: scaled),
+              ),
+              textDirection: TextDirection.ltr,
+            )..layout();
+          }
+        }
       }
     }
 
@@ -154,8 +167,6 @@ class AxisPainter {
       final tickStart = isTop ? axisPosition - tickSize : axisPosition;
       final tickEnd = isTop ? axisPosition : axisPosition + tickSize;
       canvas.drawLine(Offset(x, tickStart), Offset(x, tickEnd), axisPaint);
-
-      if (stride > 1 && i % stride != 0) continue;
 
       final textPainter = painters[i];
       final labelY = isTop
